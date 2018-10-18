@@ -1,5 +1,5 @@
 # Rscripts
-Reminders of programming I've done in the past (sensitive data removed)
+Reminders of previous programming (sensitive data removed)
 
 CONTENTS
 
