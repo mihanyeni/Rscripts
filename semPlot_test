@@ -1,0 +1,141 @@
+###################################################
+install.packages("lavaan")
+library(lavaan)
+
+#install.packages("fdrtool")
+#library(fdrtool)
+
+install.packages("semPlot")
+library(semPlot)
+###################################################
+
+model<-'
+        # measurement model
+          ind60 =~ x1 + x2 + x3
+          dem60 =~ y1 + y2 + y3 + y4
+          dem65 =~ y5 + y6 + y7 + y8
+
+        # regressions
+          dem60 ~ ind60
+          dem65 ~ ind60 + dem60
+
+        # residual covariances
+          y1 ~~ y5
+          y2 ~~ y4 + y6
+          y3 ~~ y7
+          y4 ~~ y8
+          y6 ~~ y8
+      '
+fit<-sem(model,data=PoliticalDemocracy)
+
+#???: manifests, and latents, and groups, and colors, and thresholds,???
+
+#ANSWER: manifest   = observed variable
+#ANSWER: latent     = latent variable
+#ANSWER: groups     = 
+#ANSWER: colors     =
+#ANSWER: thresholds = 
+
+#Defaults ~ KIND OF
+
+semPaths(fit, what = "paths", whatLabels = 'name', style = 'ram', layout = "tree",
+         intercepts = TRUE, residuals = TRUE, thresholds = TRUE, intStyle = "multi",
+         rotation = 1, curvature = 1, nCharNodes = 3, nCharEdges = 3, sizeMan = 5,
+         sizeLat = 8, sizeInt = 2,
+         shapeInt = "triangle", ask = FALSE, title = TRUE, title.color = "black", title.adj = 0.1,
+         title.line = -1, title.cex = 0.8, combineGroups = FALSE, 
+         groups = 'man', gui = FALSE, allVars = FALSE, edge.color = 'black',
+         reorder = TRUE, structural = FALSE, ThreshAtSide = FALSE, thresholdColor = 'orange',
+         thresholdSize = 0.5, fixedStyle = 2, freeStyle = 1,
+         as.expression = character(0), optimizeLatRes = FALSE, inheritColor = TRUE,
+         levels = c(1, 5, 6, 7), pastel = FALSE, rainbowStart = 0, intAtSide = TRUE,
+         springLevels = FALSE, nDigits = 2, exoVar = TRUE, exoCov = TRUE, centerLevels = TRUE,
+         panelGroups = FALSE, layoutSplit = FALSE, measurementLayout = "tree",
+         subRes = 4, modelOpts = list(mplusStd = "std"),
+         curveAdjacent = '<->', edge.label.cex = 0.6, cardinal = "none",
+         equalizeManifests = FALSE, covAtResiduals = TRUE, optimPoints = 1:8 * (pi/4))
+
+#Trying preferences
+semPaths(fit,what='std',whatLables='path',style='lisrel',layout='tree2',intercepts=TRUE,residuals=TRUE,
+         thresholds=TRUE,intStyle='multi',rotation=4,curve=1.5,curvature=1,nCharNodes=5,nCharEdges=1,
+         sizeMan=5,sizeLat=8,sizeInt=1,sizeMan2=5,sizeLat2=8,sizeInt2=1,shapeMan='square',shapeLat='circle',
+         shapeInt='triangle',residScale=10,edge.color='green',reorder=TRUE,structural=FALSE,ThreshAtSide=FALSE,
+         thresholdColor='orange',thresholdSize=1.5,fixedStyle=c('blue',1),freeStyle=c('red',1),as.expression='nodes',
+         optimizeLatRes=TRUE,inheritColor=TRUE,levels=c(4,5,6,7),nDigits=3,centerLevels=TRUE,layoutSplit=FALSE,
+         subRes=360,curveAdjacent='cov',cardinal=FALSE)
+
+#Meanings
+semPaths(fit,what='std',whatLables='path',style='lisrel',layout='tree2',
+         rotation=4,curve=1.5,curvature=1,centerLevels=TRUE,cardinal=FALSE)  #Meta-Styles
+
+semPaths(fit,what='path',intercepts=TRUE,residuals=TRUE,thresholds=TRUE)     #What should be included in the diagram?
+         
+semPaths(fit,nCharNodes=5,nCharEdges=1,sizeMan=5,sizeLat=8,sizeInt=1,
+         sizeMan2=5,sizeLat2=8,sizeInt2=1,
+         shapeMan='square',shapeLat='circle',shapeInt='triangle',nDigits=3)  #Node styles and numeric styles
+
+semPaths(fit,residScale=10,reorder=TRUE,structural=FALSE,ThreshAtSide=FALSE,
+         thresholdSize=1.5)                                                  #Path styles
+         
+semPaths(fit,edge.color='green',thresholdColor='orange',
+         fixedStyle=c('blue',1),freeStyle=c('red',1),inheritColor=TRUE)      #Color styles
+
+semPaths(fit,what='est',as.expression='nodes')                               #Greek letters (& where) - not working
+
+semPaths(fit,optimizeLatRes=TRUE,levels=c(4,5,6,7),layoutSplit=FALSE,
+         subRes=360,curveAdjacent='cov')                                     #Other meta-styles
+
+###################################################
+###################################################
+
+#     OTHER EXAMPLES
+
+###################################################
+###################################################
+
+# Lambda matrices:
+Loadings <- rbind(diag(1,2,2),diag(1,2,2),diag(1,2,2))
+# Phi and Psi matrices:
+LatVar <- diag(1,2,2)
+# Beta matrix:
+Beta <- matrix(0,2,2)
+Beta[1,2] <- 1
+# Theta matrices:
+ManVar <- diag(1,nrow(Loadings),nrow(Loadings))
+# Gamma matrix:
+Gamma <- diag(1,2,2)
+# Tau matrices:
+ManInts <- rep(1,6)
+# Alpha and Kappa matrices:
+LatInts <- rep(1,2)
+# Combine model:
+mod <- lisrelModel(LY=Loadings,PS=LatVar,BE=Beta,TE=ManVar,
+                   LX=Loadings,PH=LatVar,GA=Gamma,TD=ManVar,
+                   TY=ManInts,TX=ManInts,AL=LatInts,KA=LatInts)
+# Plot path diagram:
+semPaths(mod, sizeMan = 3, sizeInt = 1, sizeLat = 4)
+semPaths(mod, as.expression=c("nodes","edges"), sizeMan = 3, sizeInt = 1, sizeLat = 4)
+# Plot path diagram with more graphical options:
+semPaths(mod, as.expression=c("nodes","edges"), sizeMan = 3, sizeInt = 1, sizeLat = 4,
+         label.prop=0.5, curve=0.5, bg="black", groups="latents",
+         intercepts=FALSE, borders=FALSE, label.norm="O")
+
+###################################################
+###################################################
+
+# A silly dataset:
+A <- rnorm(100)
+B <- A + rnorm(100)
+C <- B + rnorm(100)
+DF <- data.frame(A,B,C)
+# Two regressions: 
+res1 <- lm(B ~ C, data = DF)
+res2 <- lm(A ~ B + C, data = DF)
+# Plot both in the same path diagram in two ways:
+semPaths(res1 + res2, "model", "est", intercepts=FALSE)
+semPaths(list(res1,res2), "model", "est", intercepts=FALSE)
+
+###################################################
+###################################################
+
+
