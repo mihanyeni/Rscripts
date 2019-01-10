@@ -1,0 +1,1401 @@
+#!/usr/bin/Rscript
+
+#Author: Justin Wild
+
+#################################################
+install.packages("lavaan")
+library(lavaan)
+
+install.packages("semPlot")
+library(semPlot)
+
+#################################################
+# simple regression example
+
+set.seed(1234)
+y1<-rnorm(100)
+y2<-y1*0.5+rnorm(100)
+y3<-y2*0.7+rnorm(100)
+set.seed(5678)
+x1<-rnorm(100)
+x2<-x1*0.3+rnorm(100)
+x3<-x2*0.6+rnorm(100)
+x4<-x3*1.1+rnorm(100)
+
+df1<-data.frame(y1,y2,y3,x1,x2,x3,x4)
+
+diag.SR<-'# measurement model
+            y1 =~ x1 + x2 + x3 + x4
+
+          # regressions
+          # none
+
+          # residual variances
+            x1 ~~ x1 
+            x2 ~~ x2
+            x3 ~~ x3
+            x4 ~~ x4
+            y1 ~~ y1
+            
+          # residual covariances
+          # none
+          
+          # factor variances
+          # none
+          
+          # factor covariances 
+          # none
+         '
+fit.diagSR<-sem(diag.SR,data=df1,estimator="ML")
+
+setwd("C:/Users/jcwild/Downloads/Project-SEM")
+tiff("1SimpleRegression.png",height=4,width=5,units='in',res=600)
+semPaths(fit.diagSR, "col", "est",
+         style="lisrel",layout="tree2",rotation=4,edge.color="black",
+         intercepts=T,residuals=F,thresholds=T,
+         shapeMan="square",shapeLat="square",shapeInt="square",
+         edge.label.cex=1, edge.label.position=0.5,edge.label.bg=T,
+         #label.cex=5,
+         label.scale=T,#label.font="Times",
+         edgeLabels=c(list(expression(beta[1]),expression(beta[2]),expression(beta[3]),expression(beta[4]))),
+         nodeLabels=c(as.list(list(expression(x[1]),expression(x[2]),expression(x[3]),expression(x[4]))),
+                      (list(expression(y)))))
+dev.off()
+#DoNotPlot Runs qgraph but does not plot. Useful for saving the output (i.e.layout) without plotting
+
+#################################################
+# multivariate regression example
+
+diag.MV<-'# measurement model
+            y1 =~ x1 + x2 + x3 + x4
+            y2 =~ x1 + x2 + x3 + x4
+
+          # regressions
+          # none
+
+          # residual variances
+            x1 ~~ x1 
+            x2 ~~ x2
+            x3 ~~ x3
+            x4 ~~ x4
+            y1 ~~ y1
+            y2 ~~ y2
+            
+          # residual covariances
+            y1 ~~ y2
+          
+          # factor variances
+          # nonw
+          
+          # factor covariances 
+          # none
+         '
+fit.diagMV<-sem(diag.MV,data=df1,estimator="ML")
+
+tiff("2MultivariateRegression.png",height=4,width=5,units='in',res=600)
+semPaths(fit.diagMV, "col", "est",
+         style="lisrel",layout="tree",rotation=1,edge.color=c("blue","blue","blue","blue",
+                                                              "darkorange1","darkorange1",
+                                                              "darkorange1","darkorange1"),
+         intercepts=T,residuals=F,thresholds=F,
+         shapeMan="square",shapeLat="square",shapeInt="square",
+         sizeMan=8,sizeMan2=8,sizeLat=8,sizeLat2=8,
+         edge.label.cex=1, edge.label.position=0.7,edge.label.bg=T,
+         #label.cex=5,
+         label.scale=T,#label.font="Times",
+         exoCov=F,
+         edgeLabels=c(list(expression(beta[11]),expression(beta[21]),expression(beta[31]),expression(beta[41]),
+                           expression(beta[12]),expression(beta[22]),expression(beta[32]),expression(beta[42]))),
+         nodeLabels=c(as.list(list(expression(x[1]),expression(x[2]),expression(x[3]),expression(x[4]))),
+                      (list(expression(y[1]),expression(y[2])))),
+         color=list(lat=c("cornflowerblue","lightsalmon"),man="yellowgreen"))
+dev.off()
+#################################################
+# indirect effects example
+
+set.seed(3456)
+y1<-rnorm(100)
+y2<-y1*0.5+rnorm(100)
+y3<-y2*0.7+rnorm(100)
+y4<-y3*0.2+rnorm(100)
+y5<-y4*0.3+rnorm(100)
+y6<-y5*0.6+rnorm(100)
+y7<-y6*1.1+rnorm(100)
+
+df2<-data.frame(y1,y2,y3,y4,y5,y6,y7)
+
+diag.IE<-'# measurement model
+            y5 ~ y1 + y2 + y3 + 1*y7
+            y6 ~ y4 + y5
+            y7 ~ y6
+            
+          # regressions
+          # none
+          
+            
+          # residual variances
+            y1 ~~ y1 
+            y2 ~~ y2
+            y3 ~~ y3
+            y4 ~~ y4
+            y5 ~~ y5
+            y6 ~~ y6
+            y7 ~~ y7
+            
+          # residual covariances
+          # none
+            
+          # factor variances
+          # none
+
+          # factor covariances 
+          # none
+
+          # Indirect
+          #  indirect1 := a*b
+          #  indirect2 := b*c
+          #  indirect3 := c*a
+              
+          # Contrasts
+          # none
+                
+          # Total Effects
+          # none
+         '
+fit.diagIE<-sem(diag.IE,data=df2,estimator="ML")
+
+tiff("3IndirectEffects.png",height=4,width=5,units='in',res=600)
+semPaths(fit.diagIE, "col", "est",
+         style="lisrel",layout="tree2",rotation=4,centerLevels=F,edge.color="black",
+         intercepts=T,residuals=F,thresholds=F,
+         shapeMan="square",shapeLat="square",shapeInt="square",
+         sizeMan=8,sizeMan2=8,sizeLat=8,sizeLat2=8,
+         edge.label.cex=1, edge.label.position=0.7,edge.label.bg=T,
+         #label.cex=5,
+         label.scale=T,#label.font="Times",
+         edgeLabels=c(list("","","","","","","")),
+         nodeLabels=c(as.list(list(expression(y[5]),expression(y[6]),expression(y[7]),expression(y[1]),
+                                   expression(y[2]),expression(y[3]),expression(y[4])))),
+         color=list(man=c("dodgerblue","dodgerblue","dodgerblue","yellowgreen","yellowgreen","yellowgreen","yellowgreen")))
+dev.off()
+#################################################
+# CFA example
+
+diag.CF<-'# measurement model
+            n1 =~ y1 + y2 + y3
+            n2 =~ y4 + y5 + y6
+            
+          # regressions
+          # none
+            
+            
+          # residual variances
+            y1 ~~ y1 
+            y2 ~~ y2
+            y3 ~~ y3
+            y4 ~~ y4
+            y5 ~~ y5
+            y6 ~~ y6
+            
+          # residual covariances
+          # none
+            
+          # factor variances
+            n1 ~~ n1
+            n2 ~~ n2
+            
+          # factor covariances 
+            n1 ~~ n2
+         '
+fit.diagCF<-sem(diag.CF,data=df2,estimator="ML")
+
+tiff("4CFA.png",height=4,width=5,units='in',res=600)
+semPaths(fit.diagCF, "col", "est",
+         style="lisrel",layout="tree",rotation=4,edge.color="black",
+         intercepts=T,residuals=F,thresholds=F,
+         shapeMan="square",shapeLat="circle",shapeInt="square",
+         sizeMan=8,sizeMan2=8,sizeLat=8,sizeLat2=8,
+         #edge.label.cex=1, edge.label.position=0.7,edge.label.bg=T,
+         #label.cex=5,
+         label.scale=T,#label.font="Times",
+         edgeLabels=c(list("","","","","","")),
+         nodeLabels=c(as.list(list(expression(y[1]),expression(y[2]),expression(y[3]),
+                                   expression(y[4]),expression(y[5]),expression(y[6]))),
+                      (list(expression(eta[1]),expression(eta[2])))),
+         color=list(lat="lightsalmon",man="cornsilk"))
+dev.off()
+#################################################
+# structural part example - watch video again!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+set.seed(7890)
+y1<-rnorm(100)
+y2<-y1*0.5+rnorm(100)
+y3<-y2*0.7+rnorm(100)
+y4<-y3*0.2+rnorm(100)
+y5<-y4*0.3+rnorm(100)
+y6<-y5*0.6+rnorm(100)
+y7<-y6*1.1+rnorm(100)
+y8<-y7*0.1+rnorm(100)
+y9<-y8*0.4+rnorm(100)
+y10<-y9*0.9+rnorm(100)
+y11<-y10*0.8+rnorm(100)
+y12<-y11*1.2+rnorm(100)
+
+df3<-data.frame(y1,y2,y3,y4,y5,y6,y7,y8,y9,y10,y11,y12)
+
+diag.SP<-'# measurement model
+            n1 =~ y1  + y2  + y3
+            n2 =~ y4  + y5  + y6
+            n3 =~ y7  + y8  + y9
+            n4 =~ y10 + y11 + y12
+            
+          # regressions
+            n3 ~ n1 + n2
+            n4 ~ n3
+            
+            
+          # residual variances
+            y1  ~~ y1 
+            y2  ~~ y2
+            y3  ~~ y3
+            y4  ~~ y4
+            y5  ~~ y5
+            y6  ~~ y6
+            y7  ~~ y7
+            y8  ~~ y8
+            y9  ~~ y9
+            y10 ~~ y10
+            y11 ~~ y11
+            y12 ~~ y12
+            
+          # residual covariances
+          # none
+            
+          # factor variances
+            n1 ~~ n1
+            n2 ~~ n2
+            n3 ~~ n3
+            n4 ~~ n4
+            
+          # factor covariances 
+          # none
+         '
+fit.diagSP<-sem(diag.SP,data=df3,estimator="ML")
+
+tiff("5Structural.png",height=4,width=5,units='in',res=600)
+semPaths(fit.diagSP, "col", "est",
+         style="lisrel",layout="tree",rotation=4,optimizeLatRes=T,#centerLevels=F,
+         intercepts=T,residuals=F,thresholds=F,
+         shapeMan="square",shapeLat="circle",shapeInt="square",
+         sizeMan=8,sizeMan2=8,sizeLat=8,sizeLat2=8,
+         #edge.label.cex=1, edge.label.position=0.7,edge.label.bg=T,
+         #label.cex=5,
+         exoCov=F,
+         label.scale=T,#label.font="Times",
+         edgeLabels=c(list("","","","","","")),edge.color="black",
+         nodeLabels=c(as.list(list(expression(y[1]),expression(y[2]),expression(y[3]),
+                                   expression(y[4]),expression(y[5]),expression(y[6]),
+                                   expression(y[7]),expression(y[8]),expression(y[9]),
+                                   expression(y[10]),expression(y[11]),expression(y[12]))),
+                      (list(expression(eta[1]),expression(eta[2]),expression(eta[3]),expression(eta[4])))),
+         color=list(lat="lightsalmon",man="cornsilk"))
+dev.off()
+#################################################
+# paired t-test
+
+set.seed(2345)
+y11<-rnorm(100)
+y21<-y11*0.5+rnorm(100)
+y31<-y21*0.7+rnorm(100)
+y12<-y31*0.2+rnorm(100)
+y22<-y12*0.3+rnorm(100)
+y32<-y22*0.6+rnorm(100)
+
+df4<-data.frame(y11,y21,y31,y12,y22,y32)
+
+diag.PT<-'# measurement model
+            f1 =~ y11 + y21 + y31
+            f2 =~ y12 + y22 + y32
+            
+          # regressions
+          # none
+            
+          # residual variances
+            y11 ~~ y11
+            y21 ~~ y21
+            y31 ~~ y31
+            y12 ~~ y12
+            y22 ~~ y22
+            y32 ~~ y32
+            
+          # residual covariances
+            y11 ~~ y12
+            y21 ~~ y22
+            y31 ~~ y32
+            
+          # factor variances
+            f1 ~~ f1
+            f2 ~~ f2
+
+          # factor covariances 
+            f1 ~~ f2
+         '
+fit.diagPT<-sem(diag.PT,data=df4,estimator="ML")
+
+tiff("6PairT.png",height=4,width=5,units='in',res=600)
+semPaths(fit.diagPT, "col", "est",
+         style="lisrel",layout="tree",rotation=3,#optimizeLatRes=T,#centerLevels=F,
+         intercepts=T,residuals=T,thresholds=F,
+         shapeMan="square",shapeLat="circle",#shapeInt="square",
+         sizeMan=8,sizeMan2=8,sizeLat=8,sizeLat2=8,
+         edge.label.cex=1.2,#edge.label.position=0.2,edge.label.bg=T,
+         #label.cex=5,
+         #exoCov=F,
+         label.scale=T,#label.font="Times",
+         edgeLabels=c(list("","","","","","",expression(epsilon[32]),expression(epsilon[22]),expression(epsilon[12]),
+                           expression(epsilon[31]),expression(epsilon[21]),expression(epsilon[11]))),
+         edge.color="black",
+         nodeLabels=c(as.list(list(expression(y[32]),expression(y[22]),expression(y[12]),
+                                   expression(y[31]),expression(y[21]),expression(y[11]))),
+                      (list(expression(t[2]),expression(t[1])))),
+         color=list(lat="chocolate1",man="brown1"))
+dev.off()
+#################################################
+# crosslagged ## latents not behaving as expected!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+set.seed(6789)
+y1<-rnorm(100)
+y2<-y1*0.5+rnorm(100)
+y3<-y2*0.7+rnorm(100)
+y4<-y3*0.2+rnorm(100)
+z1<-y4*0.4+rnorm(100)
+z2<-z1*0.3+rnorm(100)
+z3<-z2*0.6+rnorm(100)
+z4<-z3*0.5+rnorm(100)
+
+df5<-data.frame(y1,y2,y3,y4,z1,z2,z3,z4)
+
+diag.CL<-'# measurement model
+          # none
+            
+          # regressions
+            y4 ~ y3 + z3
+            z4 ~ y3 + z3
+            y3 ~ y2 + z2
+            z3 ~ y2 + z2
+            y2 ~ y1 + z1
+            z2 ~ y1 + z1
+            
+          # residual variances
+          # none
+
+          # residual covariances
+          # none            
+            
+          # factor variances
+            y2 ~~ y2
+            y3 ~~ y3
+            y4 ~~ y4
+            z2 ~~ z2
+            z3 ~~ z3
+            z4 ~~ z4 
+            
+          # factor covariances 
+            y1 ~~ z1
+            y4 ~~ 0*z4
+         '
+fit.diagCL<-sem(diag.CL,data=df5,estimator="ML")
+
+#################################################!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+tiff("7Crosslagged.png",height=4,width=5,units='in',res=600)
+semPaths(fit.diagCL, "col", "est",
+         style="lisrel",layout="tree3",rotation=2,layoutSplit=T,optimizeLatRes=T,optimPoints=c(1,2,3,4,5,6,7,8),#centerLevels=F,
+         intercepts=T,residuals=T,thresholds=F,
+         shapeMan="square",shapeLat="square",shapeInt="heart",
+         sizeMan=8,sizeMan2=8,sizeLat=8,sizeLat2=8,
+         edge.label.cex=1.2,#edge.label.position=0.2,edge.label.bg=T,
+         #label.cex=5,
+         subRes=360,#exoCov=F,
+         label.scale=T,#label.font="Times",
+         edgeLabels=c("","","","","","","","","","","","",
+                      expression(epsilon[21]),expression(epsilon[31]),
+                      expression(epsilon[41]),expression(epsilon[22]),
+                      expression(epsilon[32]),expression(epsilon[42]),"",""),
+         edge.color=c("black","black","black","black",
+                      "black","black","black","black",
+                      "black","black","black","black",
+                      "red","red","red","red",
+                      "red","red","black","white"),#,
+         #nodeLabels=c(as.list(list(expression(z[1]),expression(y[1]),expression(z[1]),
+          #                         expression(y[2]),expression(z[3]),expression(y[3]),
+           #                        expression(z[4]),expression(y[4])))),
+         color=list(man="lightcyan"))
+dev.off()
+
+getwd()
+
+#################################################!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+#################################################
+
+###                Bollen (1989)              ###
+
+#################################################
+# Political Democracy example
+
+diag.PD<-'# measurement model
+            ind60 =~ x1 + x2 + x3
+            dem60 =~ y1 + y2 + y3 + y4
+            dem65 =~ y5 + y6 + y7 + y8
+          # regressions
+            dem60 ~ a*ind60
+            dem65 ~ b1*ind60 + b2*dem60
+
+          # residual variances
+          # none
+
+          # residual covariances
+            y1 ~~ y5
+            y2 ~~ y4 + y6
+            y3 ~~ y7
+            y4 ~~ y8
+            y6 ~~ y8
+
+          # factor variances
+          # none
+          
+          # factor covariances 
+          # none
+         '
+fit.diagPD<-sem(diag.PD, data=PoliticalDemocracy, mimic="Mplus", estimator="ML")
+
+setwd("C:/Users/jcwild/Downloads/Project-SEM/Presentation/Pictures")
+tiff("8PolDem_LVM.png",height=4,width=5,units='in',res=600)
+semPaths(fit.diagPD, "col", "est",
+         style="lisrel",layout="tree2",rotation=4,centerLevels=T,#optimizeLatRes=T,
+         intercepts=F,residuals=T,thresholds=F,
+         shapeMan="square",shapeLat="circle",#shapeInt="square",
+         sizeMan=6,sizeMan2=6,sizeLat=8,sizeLat2=8,
+         edge.label.cex=1.2,#edge.label.position=0.2,edge.label.bg=T,
+         #label.cex=5,
+         exoCov=F,
+         label.scale=T,#label.font="Times",
+         #edgeLabels=c(list("","","","","","","","","","","",
+         #                   expression(gamma[11]),expression(gamma[21]),expression(beta[21]),
+         #                   "","","","","","",
+         #                   "","","","","","","","","","","",
+         #                   expression(zeta[1]),expression(zeta[2]))),
+         #edge.color=c("black","black","black","black","black","black","black","black","black","black","black",
+         #              "black","black","black","black","black","black","black","black","black",
+         #              "white","white","white","white","white","white","white","white","white","white","white",
+         #              "black","black"),
+         edgeLabels=c(list("1",expression(lambda["x21"]),expression(lambda["x31"]),
+                           "1",expression(lambda["y21"]),expression(lambda["y31"]),expression(lambda["y41"]),
+                           "1",expression(lambda["y62"]),expression(lambda["y72"]),expression(lambda["y82"]),
+                           "","","","","","","","","",
+                           expression(delta[1]),expression(delta[2]),expression(delta[3]),
+                           expression(epsilon[1]),expression(epsilon[2]),expression(epsilon[3]),expression(epsilon[4]),
+                           expression(epsilon[5]),expression(epsilon[6]),expression(epsilon[7]),expression(epsilon[8]),
+                           "","")),
+         edge.color=c("black","black","black","black","black","black","black","black","black","black","black",
+                       "black","black","black","black","black","black","black","black","black",
+                       "black","black","black","black","black","black","black","black","black","black","black",
+                       "white","white"),
+         nodeLabels=c(as.list(list(expression(x[1]),expression(x[2]),expression(x[3]),
+                                   expression(y[1]),expression(y[2]),expression(y[3]),expression(y[4]),
+                                   expression(y[5]),expression(y[6]),expression(y[7]),expression(y[8]))),
+                      (list("ind60","dem60","dem65"))),
+         color=list(lat="chocolate1",man="brown1"))
+dev.off()
+#################################################
+
+# Bootstrapping
+PD<-PoliticalDemocracy
+
+#Must use ML to bootstrap
+fit.PD<-sem(diag.PD, data=PD, estimator="ML", se="bootstrap", bootstrap=5000) 
+
+summary(fit.PD)
+
+
+# Compare
+fit.PD1<-sem(diag.PD,data=PD,mimic="MPlus",estimator="ML")
+summary(fit.PD1)
+
+
+tiff("9Bootstrapping.png",height=4,width=5,units='in',res=600)
+semPaths(fit.PD, "col", "est",
+         style="lisrel",layout="tree2",rotation=4,centerLevels=T,#optimizeLatRes=T,
+         intercepts=T,residuals=F,thresholds=F,
+         shapeMan="square",shapeLat="circle",#shapeInt="square",
+         sizeMan=6,sizeMan2=6,sizeLat=8,sizeLat2=8,
+         edge.label.cex=1.2,#edge.label.position=0.2,edge.label.bg=T,
+         #label.cex=5,
+         exoCov=F,
+         label.scale=T,#label.font="Times",
+         edgeLabels="",
+         edge.color="black",
+         nodeLabels=c(as.list(list(expression(x[1]),expression(x[2]),expression(x[3]),
+                                   expression(y[1]),expression(y[2]),expression(y[3]),expression(y[4]),
+                                   expression(y[5]),expression(y[6]),expression(y[7]),expression(y[8]))),
+                      (list("ind60","dem60","dem65"))),
+         color=list(lat="chocolate1",man="brown1"))
+dev.off()
+#################################################
+# multiple imupations
+
+install.packages("semTools")
+library(semTools)
+install.packages("Amelia")
+library(Amelia)
+
+
+HS.model <- ' visual  =~ x1 + x2 + x3
+              textual =~ x4 + x5 + x6
+              speed   =~ x7 + x8 + x9 '
+
+HSMiss<-HolzingerSwineford1939[,paste("x", 1:9, sep="")]
+randomMiss<-rbinom(prod(dim(HSMiss)), 1, 0.1)
+randomMiss<-matrix(as.logical(randomMiss), nrow=nrow(HSMiss))
+HSMiss[randomMiss]<-NA
+
+out<-cfa.mi(HS.model, data=HSMiss, m=3, chi="all")
+
+# Multiple imupations
+install.packages("semTools")
+library(semTools)
+
+# CFA
+out<-cfa.mi(diag.PD, data=PD, m=3, chi="all")
+
+summary(out)
+
+# SEM
+
+out<-runMI(diag.PD, data=PD, m=3, chi="all")
+
+
+
+
+inspect(out, "fit")
+inspect(out, "impute")
+
+#################################################
+# Multilevel SEM
+
+library(OpenMx)
+
+setwd("C:/Users/jcwild/Downloads/Multilevel")
+fam<-read.table("FamIQData.dat",header=T)
+colnames(fam)[1]<-"childnr"
+colnames(fam)[2]<-"family"
+colnames(fam)[8]<-"occup"
+
+#################################################!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+within <-fam[,c("family","wordlist","cards","figures","matrices","animals","occup")]
+between<-fam[!duplicated(fam$family),c("family")]
+
+betwModel<-mxModel("bw",type="RAM",
+                   mxData(between, "raw", primaryKey="family"),
+                   latentVars=c("general","wordlistB","cardsB","figuresB",
+                                "matricesB","animalsB","occupB"),
+                   # Latent variances
+                   mxPath(from=c("wordlistB","cardsB","figuresB","matricesB","animalsB","occupB")
+                          ,arrows=2,value=1,free=T),
+                   # Factor loadings for "general"
+                   mxPath(from="general",
+                          to=c("wordlistB","cardsB","figuresB","matricesB","animalsB","occupB"),
+                          arrows=1,free=T,labels=c("a","b","c","d","e","f"))
+                   )
+
+withModel<-mxModel("wi",type="RAM", betwModel,
+                   mxData(within, "raw"),
+                   manifestVars=c("wordlist","cards","figures","matrices","animals","occup"),
+                   latentVars=c("numeric","percept"),
+                   # Latent covariance
+                   mxPath(from="numeric",to="percept",arrows=2),
+                   # Residual variances
+                   mxPath(from=c("wordlist","cards","figures","matrices","animals","occup")
+                          ,arrows=2,value=1,free=T),
+                   # Means
+                   mxPath(from="one",to=c("wordlist","cards","figures","matrices","animals","occup")),
+                   # Paths
+                   mxPath(from="numeric",to=c("wordlist","cards","figures"),arrows=1,free=T,
+                          labels=c("g","h","i")),
+                   mxPath(from="percept",to=c("matrices","animals","occup"),arrows=1,free=T,
+                          labels=c("j","k","l")),
+                   # Join levels
+                   mxPath("bw.wordlistB","wordlist",values=1,free=F, joinKey="family"),
+                   mxPath("bw.cardsB",   "cards",   values=1,free=F, joinKey="family"),
+                   mxPath("bw.figuresB", "figures", values=1,free=F, joinKey="family"),
+                   mxPath("bw.matricesB","matrices",values=1,free=F, joinKey="family"),
+                   mxPath("bw.animalsB", "animals", values=1,free=F, joinKey="family"),
+                   mxPath("bw.occupB",   "occup",   values=1,free=F, joinKey="family")
+                   )
+
+famIQ<-mxRun(withModel)
+
+#################################################!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+within <-fam[,c("family","wordlist","cards","figures","matrices","animals","occup")]
+between<-fam[!duplicated(fam$family),c("family","wordlist","cards","figures","matrices","animals","occup")]
+
+betwModel<-mxModel("bw",type="RAM",
+                   mxData(between, "raw", primaryKey="family"),
+                   manifestVars=c("wordlist","cards","figures","matrices","animals","occup"),
+                   latentVars=c("general"),
+                   # Latent variances
+                   mxPath(from=c("wordlist","cards","figures","matrices","animals","occup")
+                          ,arrows=2,value=1,free=T),
+                   # Factor loadings for "general"
+                   mxPath(from="general",
+                          to=c("wordlist","cards","figures","matrices","animals","occup"),
+                          arrows=1,free=T,labels=c("a","b","c","d","e","f"))
+)
+
+withModel<-mxModel("wi",type="RAM", betwModel,
+                   mxData(within, "raw"),
+                   manifestVars=c("wordlist","cards","figures","matrices","animals","occup"),
+                   latentVars=c("numeric","percept"),
+                   # Latent covariance
+                   mxPath(from="numeric",to="percept",arrows=2),
+                   # Residual variances
+                   mxPath(from=c("wordlist","cards","figures","matrices","animals","occup")
+                          ,arrows=2,value=1,free=T),
+                   # Means
+                   mxPath(from="one",to=c("wordlist","cards","figures","matrices","animals","occup")),
+                   # Paths
+                   mxPath(from="numeric",to=c("wordlist","cards","figures"),arrows=1,free=T,
+                          labels=c("g","h","i")),
+                   mxPath(from="percept",to=c("matrices","animals","occup"),arrows=1,free=T,
+                          labels=c("j","k","l"))
+                   #,
+                   # Join levels
+                   #mxPath("bw.wordlist","wordlist",values=1,free=F, joinKey="family"),
+                   #mxPath("bw.cards",   "cards",   values=1,free=F, joinKey="family"),
+                   #mxPath("bw.figures", "figures", values=1,free=F, joinKey="family"),
+                   #mxPath("bw.matrices","matrices",values=1,free=F, joinKey="family"),
+                   #mxPath("bw.animals", "animals", values=1,free=F, joinKey="family"),
+                   #mxPath("bw.occup",   "occup",   values=1,free=F, joinKey="family")
+)
+
+famIQ<-mxRun(withModel)
+
+semPaths(famIQ)
+
+#################################################!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+galo<-read.table("Galo.dat")
+colnames(galo)<-c("school","sex","galo","advice","feduc","meduc","focc","denom")
+galo[4:7][galo[4:7]==999]<-NA
+galo$galo<-galo$galo/10
+
+within <-galo[,c("school","galo","advice","feduc","meduc","focc")]
+between<-galo[!duplicated(galo$school),c("school","denom")]
+
+betwModel<-mxModel("bw",type="RAM",
+                   mxData(between, "raw", primaryKey="school"),
+                   manifestVars=c("denom"),
+                   latentVars=c("sesB","foccB","meducB","feducB","galoB","adviceB"),
+                   # Latent variances
+                   mxPath(from=c("foccB","meducB"),arrows=2,value=1,free=T),
+                   # Residual variances
+                   mxPath(from=c("galoB","adviceB"),arrows=2,value=1,free=T),
+                   # Covariances
+                   mxPath(from="sesB",to="denom",arrows=2,free=T),
+                   # Free(?) factor loadings for "sesB"
+                   mxPath(from="sesB",
+                          to=c("foccB","meducB","feducB","adviceB"),
+                          arrows=1,free=T),
+                   # Fixed(?) factor loadings for "sesB"
+                   mxPath(from="sesB",
+                          to=c("galoB"),
+                          arrows=1,values=1,free=T,labels="aB"),
+                   # Factor loading for "denom"
+                   mxPath(from="denom",to="galoB",arrows=1,free=T,labels="bB"),
+                   # Factor loading for "galo"
+                   mxPath(from="galoB",to="adviceB",arrows=1,free=T,labels="cB"),
+                   # Means
+                   mxPath(from="one",to=c("denom"))
+                   # Indirect?
+)
+
+withModel<-mxModel("wi",type="RAM", betwModel,
+                   mxData(within, "raw"),
+                   manifestVars=c("galo","advice","feduc","meduc","focc"),
+                   latentVars=c("sesW"),
+                   # Residual variances
+                   mxPath(from=c("galo","advice","feduc","meduc","focc")
+                          ,arrows=2,value=1,free=T),
+                   # Residual covariance
+                   mxPath(from="focc",to="feduc",arrows=2),
+                   # Free(?) factor loadings for "sesW"
+                   mxPath(from="sesW",
+                          to=c("focc","meduc","feduc","advice"),
+                          arrows=1,free=T),
+                   # Fixed(?) factor loadings for "sesW"
+                   mxPath(from="sesW",
+                          to=c("galo"),
+                          arrows=1,values=1,free=T,labels="aW"),
+                   # Factor loading for "galo"
+                   mxPath(from="galo",to="advice",arrows=1,free=T,labels="cW"),
+                   # Means
+                   mxPath(from="one",to=c("galo","advice","feduc","meduc","focc")),
+                   # Join levels
+                   mxPath("bw.foccB", "focc", values=1,free=F, joinKey="school"),
+                   mxPath("bw.meducB","meduc",values=1,free=F, joinKey="school"),
+                   mxPath("bw.feducB","feduc",values=1,free=F, joinKey="school"),
+                   #mxPath("bw.sesB",  "sesW", values=1,free=F, joinKey="school"),
+                   mxPath("bw.galoB", "galo",values=1,free=F, joinKey="school"),
+                   mxPath("bw.adviceB","advice",values=1,free=F, joinKey="school")
+)
+
+withModel$expectation$.useSufficientSets<-F
+
+galoTest<-mxTryHard(withModel)
+
+#################################################!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+## http://psychological-research.org/R/OpenMx-ML-SEM_1-univariate_ri.html
+
+##
+# Multilevel Modeling in OpenMx - Demo Code.
+##
+# Based on the paper and the Mx code from the online appendix of:
+# Mehta, P. D., & Neale, M. C. (2005). People are variables too: Multilevel structural equations modeling. 
+# Psychological Methods, 10(3), 259-284.
+##
+# Author: Christian T. Seubert <christian.seubert@uibk.ac.at>
+# Date: 2013-06-22
+##
+
+require(OpenMx)
+require(nlme)
+
+#### Univariate Multilevel Random-Intercept & Random-Slope Modeling ####
+
+#### Model 4: SEM/CFA (parallel-test) formulation ####
+
+# In the SEM specification, the model is defined for each cluster j.
+# Grouping of the data: Individuals in columns, clusters in rows. Within each cluster, the order of individuals is irrelvant.
+
+# Outcome Y: 5 clusters (rows) with a maximum of 4 observations (columns) per cluster.
+# Predictor X: 5 clusters (rows) with a maximum of 4 observations (columns) per cluster, appended to each line.
+Y4<-read.csv("OpenMx-ML-SEM_3_Y4.csv") # 80x8=640 data values
+names(Y4)
+head(Y4)
+
+# Univariate Multilevel Model with Random Intercept & Random Slope 4: Estimating gamma00, gamma01, rij, and u0j.
+OpenMx.mod4<-mxModel("Univariate random intercept random slope model 4 SEM CFA formulation", 
+                     mxData(
+                            observed=Y4, 
+                            type="raw"
+                       ),
+                       # Lambda: factor-loading matrix. Corresponds to Xj and Zj matrices.
+                       # Four observations (max. obs. in clusters = 4) by 2 factors (intercept & slope).
+                       # First factor (random intercept): All factor loadings are fixed to value 1 (not estimated).
+                       # Second-factor (random slope): All factor loadings are fixed to the values of the corresponding definition variable.
+                       # -> The factor-loading for person 1 is fixed to X1; factor-loading for person 2 is fixed to X2, so on and so forth. 
+                       mxMatrix(
+                         type="Full", 
+                         nrow=4, 
+                         ncol=2,
+                         values=c(1,NA,
+                                  1,NA,
+                                  1,NA,
+                                  1,NA),
+                         free=c(F,F,
+                                F,F,
+                                F,F,
+                                F,F),
+                         labels=c(NA,"data.X1_j",
+                                  NA,"data.X2_j",
+                                  NA,"data.X3_j",
+                                  NA,"data.X4_j"),
+                         byrow=TRUE,
+                         name="L"
+                       ),
+                       # Psi: latent factor covariance matrix. Corresponds to the Gj matrix.
+                       # Matrix specification: diagonal with variances, offdiagonal with covariances.
+                       # Number of rows & columns = number of factors (intercept & slope).
+                       mxMatrix(
+                         type="Symm",
+                         nrow=2,
+                         ncol=2,
+                         values=c(2,
+                                  0,1.5),
+                         free=TRUE,
+                         labels=c("u0j",
+                                  "u0j_u1j","u1j"),
+                         byrow=TRUE,
+                         name="P"
+                       ),
+                       # Theta: residual covariance matrix. Corresponds to the Rj matrix.
+                       # Diagonal matrix containing residual variances.
+                       # Number of rows & columns = max. obs. in clusters.
+                       mxMatrix(
+                         type="Symm", 
+                         nrow=4, 
+                         ncol=4,
+                         values=c(2,
+                                  0,2,
+                                  0,0,2,
+                                  0,0,0,2),
+                         free=c(T,
+                                F,T,
+                                F,F,T,
+                                F,F,F,T),
+                         labels=c("rij",
+                                  NA,"rij",
+                                  NA,NA,"rij",
+                                  NA,NA,NA,"rij"),
+                         byrow=TRUE,
+                         name="T"
+                       ),
+                       # Alpha: latent factor mean vector. Corresponds to the fixed-effects vector B.
+                       # Number of rows = number of factors (intercept & slope).
+                       mxMatrix(
+                         type="Full", 
+                         nrow=2, 
+                         ncol=1,
+                         values=c(1,
+                                  1),
+                         labels=c("gamma00","gamma01"),
+                         free=TRUE,
+                         byrow=TRUE,
+                         name="A"
+                       ),
+                       # V: computing model-implied covariance matrix (for cluster j).
+                       mxAlgebra(
+                         expression = L %*% P %*% t(L) + T,
+                         name="S"
+                       ),
+                       # M: computing model-implied means (for cluster j).
+                       # Other than in the Mx script, X %*% B must be transposed, otherwise mxFIMLObjective will produce an error.
+                       # (means="M" expects a 1xn matrix, not a nx1 matrix)
+                       mxAlgebra(
+                         expression = t(L %*% A),
+                         name="M"
+                       ),
+                       # The objective function expects the means model, the covariance model, and the name of the DVs.
+                       mxFIMLObjective(
+                         covariance="S", # matrix of model-implied covariances
+                         means="M", # matrix of model-implied means
+                         dimnames=dimnames(Y4)[[2]][1:4]
+                       )
+)
+OpenMx.fit4 <- mxRun(OpenMx.mod4)
+summary(OpenMx.fit4)
+
+semPaths(OpenMX.fit4)
+
+# This model is equivalent to:
+Y4.lme<-read.csv("OpenMx-ML-SEM_3_Y4.lme.csv") # 320x2=640 data values + clustering variable -> equivalent to Y4
+names(Y4.lme)
+head(Y4.lme)
+
+lme.mod4<-lme(Y~X,random=~X|cluster,data=Y4.lme,method="ML")
+summary(lme.mod4)
+VarCorr(lme.mod4)
+
+plot(lme.mod4, cluster ~ resid(.))
+
+install.packages("MplusAutomation")
+library(MplusAutomation)
+
+semPaths(file.choose(), "model", "estimates",
+         style = "lisrel", curve = 0.8, nCharNodes = 0,
+         sizeLat = 12, sizeLat2 = 6, title = TRUE,
+         mar = c(5, 1, 5, 1), curvePivot = FALSE,
+         edge.label.cex = 0.5)
+
+
+#################################################!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+#################################################
+
+###        Holzinger, Swineford (1939)        ###
+
+#################################################
+
+HS<-HolzingerSwineford1939
+
+HS.model<-'
+          # measurement model
+            visual  =~ x1 + x2 + x3
+            textual =~ x4 + x5 + x6
+            speed   =~ x7 + x8 + x9
+
+          # regressions
+          # none
+
+          # residual variances
+          # would happen without specification
+            x1 ~~ x1
+            x2 ~~ x2
+            x3 ~~ x3
+            x4 ~~ x4
+            x5 ~~ x5
+            x6 ~~ x6
+            x7 ~~ x7
+            x8 ~~ x8
+            x9 ~~ x9
+
+          # residual covariances
+          # none
+
+          # factor variances
+          # would happen without specification
+            visual  ~~ visual
+            textual ~~ textual
+            speed   ~~ speed
+
+          # factor covariances
+            visual  ~~ textual + speed
+            textual ~~ speed
+'
+
+fit.HS<-cfa(HS.model, data=HolzingerSwineford1939, estimator="MLR", mimic="Mplus")
+
+#Summary of analysis
+summary(fit.HS,fit.measures=TRUE,rsquare=TRUE)
+
+#Just coefficients
+coef(fit.HS)
+
+#Highlighted in GREEN
+
+#Model fit information
+fitMeasures(fit.HS)
+fitMeasures(fit.HS,c("chisq.scaled","df.scaled","pvalue.scaled","chisq.scaling.factor",
+                     "cfi","tli","rmsea.scaled","rmsea.ci.lower.scaled","rmsea.ci.upper.scaled",
+                     "rmsea.pvalue.scaled"))
+
+#Bug: only prints out in the basic fit command
+fitMeasures(fit.HS,c("baseline.chisq.scaled","baseline.df.scaled","baseline.pvalue.scaled"))
+
+#Some fit measurements: AIC, BIC, ChiSq
+anova(fit.HS,fitMeasures=TRUE)
+#Highlighted in YELLOW
+
+#For just parameter estimates
+parameterEstimates(fit.HS,se=TRUE)
+
+#Standardized model results
+standardizedSolution(fit.HS)
+#Highlighted in LIGHT BLUE
+
+#Calculating CR, AVE, and H
+##Getting count, sum, and sum of squares for LAMBDAs
+std.cfa<-standardizedSolution(fit.HS)
+names(std.cfa)
+std.cfa
+
+#LAMDBA 1
+##count
+count.lambda1<-sum(std.cfa$lhs=="ind60" & std.cfa$op=="=~")
+count.lambda1
+##sum
+std.cfa.lambda1<-subset(std.cfa,lhs=="ind60" & op=="=~")
+std.cfa.lambda1
+sum.lambda1<-sum(std.cfa.lambda1$est.std)
+sum.lambda1
+##square of sum
+sq.sum.lambda1<-sum.lambda1^2
+sq.sum.lambda1
+##sum of squares
+std.cfa.lambda1$est.std.sq<-with(std.cfa.lambda1,std.cfa.lambda1$est.std^2)
+std.cfa.lambda1
+ss.lambda1<-sum(std.cfa.lambda1$est.std.sq)
+ss.lambda1
+##sum of squares MINUS 1
+std.cfa.lambda1$est.std.sqLessOne<-with(std.cfa.lambda1,1-std.cfa.lambda1$est.std.sq)
+std.cfa.lambda1
+ssm1.lambda1<-sum(std.cfa.lambda1$est.std.sqLessOne)
+ssm1.lambda1
+#CR of LAMBDA 1
+cr.lambda1<-sq.sum.lambda1/(sq.sum.lambda1+ssm1.lambda1)
+cr.lambda1
+#AVE of LAMBDA 1
+ave.lambda1<-ss.lambda1/count.lambda1
+ave.lambda1
+#H of LAMBDA 1
+std.cfa.lambda1$hCalc<-with(std.cfa.lambda1,est.std.sq/est.std.sqLessOne)
+std.cfa.lambda1
+hCalc.lambda1<-sum(std.cfa.lambda1$hCalc)
+hCalc.lambda1
+h.lambda1<-1/(1+1/hCalc.lambda1)
+h.lambda1
+
+#LAMDBA 2
+##count
+count.lambda2<-sum(std.cfa$lhs=="textual" & std.cfa$op=="=~")
+count.lambda2
+##sum
+std.cfa.lambda2<-subset(std.cfa,lhs=="textual" & op=="=~")
+std.cfa.lambda2
+sum.lambda2<-sum(std.cfa.lambda2$est.std)
+sum.lambda2
+##square of sum
+sq.sum.lambda2<-sum.lambda2^2
+sq.sum.lambda2
+##sum of squares
+std.cfa.lambda2$est.std.sq<-with(std.cfa.lambda2,std.cfa.lambda2$est.std^2)
+std.cfa.lambda2
+ss.lambda2<-sum(std.cfa.lambda2$est.std.sq)
+ss.lambda2
+##sum of squares MINUS 1
+std.cfa.lambda2$est.std.sqLessOne<-with(std.cfa.lambda2,1-std.cfa.lambda2$est.std.sq)
+std.cfa.lambda2
+ssm1.lambda2<-sum(std.cfa.lambda2$est.std.sqLessOne)
+ssm1.lambda2
+#CR of LAMBDA 2
+cr.lambda2<-sq.sum.lambda2/(sq.sum.lambda2+ssm1.lambda2)
+cr.lambda2
+#AVE of LAMBDA 2
+ave.lambda2<-ss.lambda2/count.lambda2
+ave.lambda2
+#H of LAMBDA 2
+std.cfa.lambda2$hCalc<-with(std.cfa.lambda2,est.std.sq/est.std.sqLessOne)
+std.cfa.lambda2
+hCalc.lambda2<-sum(std.cfa.lambda2$hCalc)
+hCalc.lambda2
+h.lambda2<-1/(1+1/hCalc.lambda2)
+h.lambda2
+
+#LAMDBA 3
+##count
+count.lambda3<-sum(std.cfa$lhs=="speed" & std.cfa$op=="=~")
+count.lambda3
+##sum
+std.cfa.lambda3<-subset(std.cfa,lhs=="speed" & op=="=~")
+std.cfa.lambda3
+sum.lambda3<-sum(std.cfa.lambda3$est.std)
+sum.lambda3
+##square of sum
+sq.sum.lambda3<-sum.lambda3^2
+sq.sum.lambda3
+##sum of squares
+std.cfa.lambda3$est.std.sq<-with(std.cfa.lambda3,std.cfa.lambda3$est.std^2)
+std.cfa.lambda3
+ss.lambda3<-sum(std.cfa.lambda3$est.std.sq)
+ss.lambda3
+##sum of squares MINUS 1
+std.cfa.lambda3$est.std.sqLessOne<-with(std.cfa.lambda3,1-std.cfa.lambda3$est.std.sq)
+std.cfa.lambda3
+ssm1.lambda3<-sum(std.cfa.lambda3$est.std.sqLessOne)
+ssm1.lambda3
+#CR of LAMBDA 3
+cr.lambda3<-sq.sum.lambda3/(sq.sum.lambda3+ssm1.lambda3)
+cr.lambda3
+#AVE of LAMBDA 3
+ave.lambda3<-ss.lambda3/count.lambda3
+ave.lambda3
+#H of LAMBDA 3
+std.cfa.lambda3$hCalc<-with(std.cfa.lambda3,est.std.sq/est.std.sqLessOne)
+std.cfa.lambda3
+hCalc.lambda3<-sum(std.cfa.lambda3$hCalc)
+hCalc.lambda3
+h.lambda3<-1/(1+1/hCalc.lambda3)
+h.lambda3
+#Defaults ~ KIND OF
+
+semPaths(fit, what = "paths", whatLabels = 'name', style = 'ram', layout = "tree",
+         intercepts = TRUE, residuals = TRUE, thresholds = TRUE, intStyle = "multi",
+         rotation = 1, curvature = 1, nCharNodes = 3, nCharEdges = 3, sizeMan = 5,
+         sizeLat = 8, sizeInt = 2,
+         shapeInt = "triangle", ask = FALSE, title = TRUE, title.color = "black", title.adj = 0.1,
+         title.line = -1, title.cex = 0.8, combineGroups = FALSE, 
+         groups = 'man', gui = FALSE, allVars = FALSE, edge.color = 'black',
+         reorder = TRUE, structural = FALSE, ThreshAtSide = FALSE, thresholdColor = 'orange',
+         thresholdSize = 0.5, fixedStyle = 2, freeStyle = 1,
+         as.expression = character(0), optimizeLatRes = FALSE, inheritColor = TRUE,
+         levels = c(1, 5, 6, 7), pastel = FALSE, rainbowStart = 0, intAtSide = TRUE,
+         springLevels = FALSE, nDigits = 2, exoVar = TRUE, exoCov = TRUE, centerLevels = TRUE,
+         panelGroups = FALSE, layoutSplit = FALSE, measurementLayout = "tree",
+         subRes = 4, modelOpts = list(mplusStd = "std"),
+         curveAdjacent = '<->', edge.label.cex = 0.6, cardinal = "none",
+         equalizeManifests = FALSE, covAtResiduals = TRUE, optimPoints = 1:8 * (pi/4))
+
+#Trying preferences
+semPaths(fit,what='std',whatLables='path',style='lisrel',layout='tree2',intercepts=TRUE,residuals=TRUE,
+         thresholds=TRUE,intStyle='multi',rotation=4,curve=1.5,curvature=1,nCharNodes=5,nCharEdges=1,
+         sizeMan=5,sizeLat=8,sizeInt=1,sizeMan2=5,sizeLat2=8,sizeInt2=1,shapeMan='square',shapeLat='circle',
+         shapeInt='triangle',residScale=10,edge.color='green',reorder=TRUE,structural=FALSE,ThreshAtSide=FALSE,
+         thresholdColor='orange',thresholdSize=1.5,fixedStyle=c('blue',1),freeStyle=c('red',1),as.expression='nodes',
+         optimizeLatRes=TRUE,inheritColor=TRUE,levels=c(4,5,6,7),nDigits=3,centerLevels=TRUE,layoutSplit=FALSE,
+         subRes=360,curveAdjacent='cov',cardinal=FALSE)
+
+#Meanings
+semPaths(fit,what='std',whatLables='path',style='lisrel',layout='tree2',
+         rotation=4,curve=1.5,curvature=1,centerLevels=TRUE,cardinal=FALSE)  #Meta-Styles
+
+semPaths(fit,what='path',intercepts=TRUE,residuals=TRUE,thresholds=TRUE)     #What should be included in the diagram?
+
+semPaths(fit,nCharNodes=5,nCharEdges=1,sizeMan=5,sizeLat=8,sizeInt=1,
+         sizeMan2=5,sizeLat2=8,sizeInt2=1,
+         shapeMan='square',shapeLat='circle',shapeInt='triangle',nDigits=3)  #Node styles and numeric styles
+
+semPaths(fit,residScale=10,reorder=TRUE,structural=FALSE,ThreshAtSide=FALSE,
+         thresholdSize=1.5)                                                  #Path styles
+
+semPaths(fit,edge.color='green',thresholdColor='orange',
+         fixedStyle=c('blue',1),freeStyle=c('red',1),inheritColor=TRUE)      #Color styles
+
+semPaths(fit,what='est',as.expression='nodes')                               #Greek letters (& where) - not working
+
+semPaths(fit,optimizeLatRes=TRUE,levels=c(4,5,6,7),layoutSplit=FALSE,
+         subRes=360,curveAdjacent='cov')                                     #Other meta-styles
+
+###################################################
+
+###                  DEMOCRACY                  ###
+
+###################################################
+
+demo.model<-'
+            # measurement model
+              ind60 =~ 1*x1 + x2 + x3
+              dem60 =~ 1*y1 + y2 + y3 + y4
+              dem65 =~ 1*y5 + y6 + y7 + y8
+
+            # regressions
+              dem60 ~ a1*ind60
+              dem65 ~ a2*ind60 + b1*dem60
+
+            # residual variances
+            # would happen without specification
+              x1 ~~ x1
+              x2 ~~ x2
+              x3 ~~ x3
+              y1 ~~ y1
+              y2 ~~ y2
+              y3 ~~ y3
+              y4 ~~ y4
+              y5 ~~ y5
+              y6 ~~ y6
+              y7 ~~ y7
+              y8 ~~ y8
+
+            # residual covariances
+              y1 ~~ y5
+              y2 ~~ y4 + y6
+              y3 ~~ y7
+              y4 ~~ y8
+              y6 ~~ y8
+
+            # factor variances
+            # would happen without specification
+              dem60 ~~ dem60
+              dem65 ~~ dem65
+              ind60 ~~ ind60
+
+            # factor covariances
+            # none
+
+            # indirect effects
+              indirect1 := a1*b1
+          
+            # contrasts
+            # none
+                
+            # total effects
+              total1 := (a1*b1) + a2)
+            '
+
+fit.demo<-sem(demo.model,data=PoliticalDemocracy)
+
+#Summary of analysis
+summary(fit.demo,fit.measures=TRUE,rsquare=TRUE)
+
+#Just coefficients
+coef(fit.demo)
+
+#Highlighted in GREEN
+
+#Model fit information
+fitMeasures(fit.demo)
+fitMeasures(fit.demo,c("chisq.scaled","df.scaled","pvalue.scaled","chisq.scaling.factor",
+                       "cfi","tli","rmsea.scaled","rmsea.ci.lower.scaled","rmsea.ci.upper.scaled",
+                       "rmsea.pvalue.scaled"))
+
+#Bug: only prints out in the basic fit command
+fitMeasures(fit.demo,c("baseline.chisq.scaled","baseline.df.scaled","baseline.pvalue.scaled"))
+
+#Some fit measurements: AIC, BIC, ChiSq
+anova(fit.demo,fitMeasures=TRUE)
+#Highlighted in YELLOW
+
+#For just parameter estimates
+parameterEstimates(fit.demo,se=TRUE)
+
+#Standardized model results
+standardizedSolution(fit.demo)
+#Highlighted in LIGHT BLUE
+
+#Calculating CR, AVE, and H
+##Getting count, sum, and sum of squares for LAMBDAs
+std.cfa<-standardizedSolution(fit.demo)
+names(std.cfa)
+std.cfa
+
+#LAMDBA 1
+##count
+count.lambda1<-sum(std.cfa$lhs=="dem60" & std.cfa$op=="=~")
+count.lambda1
+##sum
+std.cfa.lambda1<-subset(std.cfa,lhs=="dem60" & op=="=~")
+std.cfa.lambda1
+sum.lambda1<-sum(std.cfa.lambda1$est.std)
+sum.lambda1
+##square of sum
+sq.sum.lambda1<-sum.lambda1^2
+sq.sum.lambda1
+##sum of squares
+std.cfa.lambda1$est.std.sq<-with(std.cfa.lambda1,std.cfa.lambda1$est.std^2)
+std.cfa.lambda1
+ss.lambda1<-sum(std.cfa.lambda1$est.std.sq)
+ss.lambda1
+##sum of squares MINUS 1
+std.cfa.lambda1$est.std.sqLessOne<-with(std.cfa.lambda1,1-std.cfa.lambda1$est.std.sq)
+std.cfa.lambda1
+ssm1.lambda1<-sum(std.cfa.lambda1$est.std.sqLessOne)
+ssm1.lambda1
+#CR of LAMBDA 1
+cr.lambda1<-sq.sum.lambda1/(sq.sum.lambda1+ssm1.lambda1)
+cr.lambda1
+#AVE of LAMBDA 1
+ave.lambda1<-ss.lambda1/count.lambda1
+ave.lambda1
+#H of LAMBDA 1
+std.cfa.lambda1$hCalc<-with(std.cfa.lambda1,est.std.sq/est.std.sqLessOne)
+std.cfa.lambda1
+hCalc.lambda1<-sum(std.cfa.lambda1$hCalc)
+hCalc.lambda1
+h.lambda1<-1/(1+1/hCalc.lambda1)
+h.lambda1
+
+#LAMDBA 2
+##count
+count.lambda2<-sum(std.cfa$lhs=="dem65" & std.cfa$op=="=~")
+count.lambda2
+##sum
+std.cfa.lambda2<-subset(std.cfa,lhs=="dem65" & op=="=~")
+std.cfa.lambda2
+sum.lambda2<-sum(std.cfa.lambda2$est.std)
+sum.lambda2
+##square of sum
+sq.sum.lambda2<-sum.lambda2^2
+sq.sum.lambda2
+##sum of squares
+std.cfa.lambda2$est.std.sq<-with(std.cfa.lambda2,std.cfa.lambda2$est.std^2)
+std.cfa.lambda2
+ss.lambda2<-sum(std.cfa.lambda2$est.std.sq)
+ss.lambda2
+##sum of squares MINUS 1
+std.cfa.lambda2$est.std.sqLessOne<-with(std.cfa.lambda2,1-std.cfa.lambda2$est.std.sq)
+std.cfa.lambda2
+ssm1.lambda2<-sum(std.cfa.lambda2$est.std.sqLessOne)
+ssm1.lambda2
+#CR of LAMBDA 2
+cr.lambda2<-sq.sum.lambda2/(sq.sum.lambda2+ssm1.lambda2)
+cr.lambda2
+#AVE of LAMBDA 2
+ave.lambda2<-ss.lambda2/count.lambda2
+ave.lambda2
+#H of LAMBDA 2
+std.cfa.lambda2$hCalc<-with(std.cfa.lambda2,est.std.sq/est.std.sqLessOne)
+std.cfa.lambda2
+hCalc.lambda2<-sum(std.cfa.lambda2$hCalc)
+hCalc.lambda2
+h.lambda2<-1/(1+1/hCalc.lambda2)
+h.lambda2
+
+#LAMDBA 3
+##count
+count.lambda3<-sum(std.cfa$lhs=="ind60" & std.cfa$op=="=~")
+count.lambda3
+##sum
+std.cfa.lambda3<-subset(std.cfa,lhs=="ind60" & op=="=~")
+std.cfa.lambda3
+sum.lambda3<-sum(std.cfa.lambda3$est.std)
+sum.lambda3
+##square of sum
+sq.sum.lambda3<-sum.lambda3^2
+sq.sum.lambda3
+##sum of squares
+std.cfa.lambda3$est.std.sq<-with(std.cfa.lambda3,std.cfa.lambda3$est.std^2)
+std.cfa.lambda3
+ss.lambda3<-sum(std.cfa.lambda3$est.std.sq)
+ss.lambda3
+##sum of squares MINUS 1
+std.cfa.lambda3$est.std.sqLessOne<-with(std.cfa.lambda3,1-std.cfa.lambda3$est.std.sq)
+std.cfa.lambda3
+ssm1.lambda3<-sum(std.cfa.lambda3$est.std.sqLessOne)
+ssm1.lambda3
+#CR of LAMBDA 3
+cr.lambda3<-sq.sum.lambda3/(sq.sum.lambda3+ssm1.lambda3)
+cr.lambda3
+#AVE of LAMBDA 3
+ave.lambda3<-ss.lambda3/count.lambda3
+ave.lambda3
+#H of LAMBDA 3
+std.cfa.lambda3$hCalc<-with(std.cfa.lambda3,est.std.sq/est.std.sqLessOne)
+std.cfa.lambda3
+hCalc.lambda3<-sum(std.cfa.lambda3$hCalc)
+hCalc.lambda3
+h.lambda3<-1/(1+1/hCalc.lambda3)
+h.lambda3
+#Defaults ~ KIND OF
+
+semPaths(fit, what = "paths", whatLabels = 'name', style = 'ram', layout = "tree",
+         intercepts = TRUE, residuals = TRUE, thresholds = TRUE, intStyle = "multi",
+         rotation = 1, curvature = 1, nCharNodes = 3, nCharEdges = 3, sizeMan = 5,
+         sizeLat = 8, sizeInt = 2,
+         shapeInt = "triangle", ask = FALSE, title = TRUE, title.color = "black", title.adj = 0.1,
+         title.line = -1, title.cex = 0.8, combineGroups = FALSE, 
+         groups = 'man', gui = FALSE, allVars = FALSE, edge.color = 'black',
+         reorder = TRUE, structural = FALSE, ThreshAtSide = FALSE, thresholdColor = 'orange',
+         thresholdSize = 0.5, fixedStyle = 2, freeStyle = 1,
+         as.expression = character(0), optimizeLatRes = FALSE, inheritColor = TRUE,
+         levels = c(1, 5, 6, 7), pastel = FALSE, rainbowStart = 0, intAtSide = TRUE,
+         springLevels = FALSE, nDigits = 2, exoVar = TRUE, exoCov = TRUE, centerLevels = TRUE,
+         panelGroups = FALSE, layoutSplit = FALSE, measurementLayout = "tree",
+         subRes = 4, modelOpts = list(mplusStd = "std"),
+         curveAdjacent = '<->', edge.label.cex = 0.6, cardinal = "none",
+         equalizeManifests = FALSE, covAtResiduals = TRUE, optimPoints = 1:8 * (pi/4))
+
+#Trying preferences
+semPaths(fit,what='std',whatLables='path',style='lisrel',layout='tree2',intercepts=TRUE,residuals=TRUE,
+         thresholds=TRUE,intStyle='multi',rotation=4,curve=1.5,curvature=1,nCharNodes=5,nCharEdges=1,
+         sizeMan=5,sizeLat=8,sizeInt=1,sizeMan2=5,sizeLat2=8,sizeInt2=1,shapeMan='square',shapeLat='circle',
+         shapeInt='triangle',residScale=10,edge.color='green',reorder=TRUE,structural=FALSE,ThreshAtSide=FALSE,
+         thresholdColor='orange',thresholdSize=1.5,fixedStyle=c('blue',1),freeStyle=c('red',1),as.expression='nodes',
+         optimizeLatRes=TRUE,inheritColor=TRUE,levels=c(4,5,6,7),nDigits=3,centerLevels=TRUE,layoutSplit=FALSE,
+         subRes=360,curveAdjacent='cov',cardinal=FALSE)
+
+#Meanings
+semPaths(fit,what='std',whatLables='path',style='lisrel',layout='tree2',
+         rotation=4,curve=1.5,curvature=1,centerLevels=TRUE,cardinal=FALSE)  #Meta-Styles
+
+semPaths(fit,what='path',intercepts=TRUE,residuals=TRUE,thresholds=TRUE)     #What should be included in the diagram?
+         
+semPaths(fit,nCharNodes=5,nCharEdges=1,sizeMan=5,sizeLat=8,sizeInt=1,
+         sizeMan2=5,sizeLat2=8,sizeInt2=1,
+         shapeMan='square',shapeLat='circle',shapeInt='triangle',nDigits=3)  #Node styles and numeric styles
+
+semPaths(fit,residScale=10,reorder=TRUE,structural=FALSE,ThreshAtSide=FALSE,
+         thresholdSize=1.5)                                                  #Path styles
+         
+semPaths(fit,edge.color='green',thresholdColor='orange',
+         fixedStyle=c('blue',1),freeStyle=c('red',1),inheritColor=TRUE)      #Color styles
+
+semPaths(fit,what='est',as.expression='nodes')                               #Greek letters (& where) - not working
+
+semPaths(fit,optimizeLatRes=TRUE,levels=c(4,5,6,7),layoutSplit=FALSE,
+         subRes=360,curveAdjacent='cov')                                     #Other meta-styles
+
