@@ -1,34 +1,19 @@
 #!usr/bin/Rscript
 
-# Syntax author:   Justin Wild, Ph.D.                            #
-# email:           justin.wild@iea-hamburg.de                    #
-# Affiliation:     IEA Hamburg                                   #
+# Syntax author:   ******************                            #
+# email:           **************************                    #
+# Affiliation:     ***********                                   #
 # Syntax language: R (3.4.4)                                     #
-# Project:         TALIS 2018                                    #
+# Project:         **********                                    #
 # Analysis:        Testing for Main Study (MS)                   #
 # Last update:     01-Nov-2018                                   #
 
 # Title:   MG CFA: Cross Country, Cross Population
-# Purpose: Create 2018 TALIS Scales cross country, cross population MG CFA Mplus input & output for
+# Purpose: Create ********** Scales cross country, cross population MG CFA Mplus input & output for
 #          invariance testing
 
 ###################################################################################################
 
-# This syntax is the located in the directories:
-#   Z:\TALIS\TALIS2018\3_MS\Analysis\02Implementation\1PreliminaryAnalysis\Teacher\2PRG\2Validation\05MGCFACrossCntCrossPopMI
-#   Z:\TALIS\TALIS2018\3_MS\Analysis\02Implementation\1PreliminaryAnalysis\Principal\2PRG\2Validation\05MGCFACrossCntCrossPopMI
-# and
-#   Z:\TALIS\TALIS2018\3_MS\Analysis\02Implementation\2FinalAnalysis\Teacher\2PRG\2Validation\05MGCFACrossCntCrossPopMI
-#   Z:\TALIS\TALIS2018\3_MS\Analysis\02Implementation\2FinalAnalysis\Principal\2PRG\2Validation\05MGCFACrossCntCrossPopMI
-
-# The syntax relies on data sets created by the R script: "Prelim_Create_Text_Files.R"
-# The R script and data sets can be found at:
-
-#   Z:\TALIS\TALIS2018\3_MS\Analysis\02Implementation\1PreliminaryAnalysis\Teacher\2PRG\2Validation
-#   Z:\TALIS\TALIS2018\3_MS\Analysis\02Implementation\1PreliminaryAnalysis\Principal\2PRG\2Validation
-# and
-#   Z:\TALIS\TALIS2018\3_MS\Analysis\02Implementation\2FinalAnalysis\Teacher\2PRG\2Validation
-#   Z:\TALIS\TALIS2018\3_MS\Analysis\02Implementation\2FinalAnalysis\Principal\2PRG\2Validation
 
 ###################################################################################################
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!#
@@ -43,17 +28,15 @@
 
 # Set directory path keywords
 # NOTE: This section has the user choose between two sets of options: Analysis Stage & Population
-#       It relies on the folder structure of TALIS 2018. The TALIS 2018 MS study Implementation
+#       It relies on the folder structure of **********. The TALIS 2018 MS study Implementation
 #       folder structure can be found at:
-#       Z:\TALIS\TALIS2018\3_MS\Analysis\01Preparation\folders.txt
+#       Z:\***************\3_MS\Analysis\01Preparation\folders.txt
 
 # Which analysis are you working on?                  Remove the "#" of the appropriate stage.
 #setAnalysisStage <- "1PreliminaryAnalysis"
 setAnalysisStage <- "2FinalAnalysis"
 
 # Are you interested in Teacher or Principal data?    Remove the "#" of the appropriate data.
-setPopulationDta <- "Teacher"
-#setPopulationDta <- "Principal"
 
 # Which round of analysis are you working on?         Remove the "#" of the appropriate round.
 #setAnalysisRound <- "1FirstRound"
@@ -63,7 +46,7 @@ setAnalysisRound <- "3FinalScaleResults"
 # Which data will you be working with?                Remove the "#" of the appropriate data folder.
 ## Raw data
 #setDataFileFoldr <- ""
-## Data with cases removed that should not be in the analysis (e.g. South Africa, TALIS-PISA link)
+## Data with cases removed that should not be in the analysis (e.g. *****************************)
 #setDataFileFoldr <- "\\\\1RemovedCases"
 ## Data with added phantom indicators for missing items or items with zero covariance
 #setDataFileFoldr <- "\\\\2AddedPhantoms"
@@ -82,20 +65,7 @@ setDataFileFoldr <- "\\\\1AddedSuperGroupID"
 # NOTE: For this code, please use "\\" between folders; R has special uses for "\" with certain
 #       characters; if you use "\", you will likely get an error
 ## Directory where text files are stored
-dirText <- paste0("Z:\\TALIS\\TALIS2018\\3_MS\\Analysis\\02Implementation\\",setAnalysisStage,"\\",
-                  setPopulationDta,"\\2PRG\\2Validation")
-## Directory where the data is stored
-dirData <- paste0("Z:\\TALIS\\TALIS2018\\3_MS\\Analysis\\02Implementation\\",setAnalysisStage,"\\",
-                  setPopulationDta,"\\1Data\\3Validation",setDataFileFoldr)
-## Directory where the master scale MGCFA crosstable is stored
-dirScal <- paste0("Z:\\TALIS\\TALIS2018\\3_MS\\Analysis\\02Implementation\\",setAnalysisStage,"\\",
-                  setPopulationDta,"\\5ArchiveAndDoc\\03_MGCFA MI Improvements")
-## Directory where improvements are stored
-dirImpr <- paste0("Z:\\TALIS\\TALIS2018\\3_MS\\Analysis\\02Implementation\\",setAnalysisStage,"\\",
-                  setPopulationDta,"\\4Validation")
-## Directory where CFA scale files will be stored
-dirCFAs <- paste0("Z:\\TALIS\\TALIS2018\\3_MS\\Analysis\\02Implementation\\",setAnalysisStage,"\\",
-                  setPopulationDta,"\\4Validation\\05MGCFACrossCntCrossPopMI\\",setAnalysisRound)
+
 
 # Names of needed files
 ## Names of the scale lists for each type of scale
@@ -124,7 +94,7 @@ writeMGCFA_CCCP <- function(scale, items, catgr, estmt, invar){
       '<tabspace>MG CFA for <scl.name> - Cross-Country, Cross Population.',
       '',
       'DATA: FILE IS',
-      '<tabspace>"Z:\\TALIS\\TALIS2018\\3_MS\\Analysis\\02Implementation\\',
+      '<tabspace>"Z:\\****************\\3_MS\\Analysis\\02Implementation\\',
       '<tabspace><data.pth>',
       '<tabspace><scl.name>.dat";',
       '',
@@ -210,13 +180,13 @@ writeMGCFA_CCCP <- function(scale, items, catgr, estmt, invar){
 dPath <- paste0(setAnalysisStage,"\\\\",setPopulationDta,"\\\\1Data\\\\3Validation",setDataFileFoldr,"\\\\")
 tabSp <- "     "
 ### Set ID, stratification, and cluster variables
-if(setPopulationDta== "Teacher"){
-  idvar <- "IDTEACH"
+if(setPopulationDta== "*******"){
+  idvar <- "*******"
   strat <- "BRRTZONE"
   clust <- "BRRTREP"
 }
-if(setPopulationDta== "Principal"){
-  idvar <- "IDSCHOOL"
+if(setPopulationDta== "*********"){
+  idvar <- "********"
   strat <- "BRRSZONE"
   clust <- "BRRSREP"
 }
@@ -854,9 +824,9 @@ for(z in c(6)){
   }
   model <- c(model1,"",modelPrmNm,modelConst1,modelFixVr,modelFixMn,modelConst2,modelRef)
   ### Create Scale directory
-  dir.create(paste("Z:/TALIS/TALIS2018/3_MS/Analysis/02Implementation/2FinalAnalysis/Principal/4Validation/05MGCFACrossCntCrossPopMI/1FirstRound/separateMD", scale, sep="\\"), showWarnings=T, recursive=T)
+  dir.create(paste("Z:/***************/3_MS/Analysis/02Implementation/2FinalAnalysis/Principal/4Validation/05MGCFACrossCntCrossPopMI/1FirstRound/separateMD", scale, sep="\\"), showWarnings=T, recursive=T)
   ### Set the working directory to the created Scale directory
-  setwd(file.path("Z:/TALIS/TALIS2018/3_MS/Analysis/02Implementation/2FinalAnalysis/Principal/4Validation/05MGCFACrossCntCrossPopMI/1FirstRound/separateMD", scale))
+  setwd(file.path("Z:/***************/3_MS/Analysis/02Implementation/2FinalAnalysis/Principal/4Validation/05MGCFACrossCntCrossPopMI/1FirstRound/separateMD", scale))
   ### Use the function to create the Mplus input in the directory
   writeMGCFA_CCCP(scale, items, catgr, estmt, invar)
 }
