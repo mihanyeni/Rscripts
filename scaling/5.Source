@@ -1,0 +1,908 @@
+#!usr/bin/Rscript
+
+# Syntax author:   ******************                            #
+# email:           **************************                    #
+# Affiliation:     ***********                                   #
+# Syntax language: R (3.4.4)                                     #
+# Project:         **********                                    #
+# Analysis:        ***************************                   #
+# Last update:     13-Jan-2019                                   #
+
+# Title:   CFA with Cross Country, Cross Population invariance levels
+# Purpose: Create ***************** cross country, cross population CFA Mplus input & output with proper syntax for determined invariance levels
+
+###################################################################################################
+
+dir1Intro=""
+dir2Group="Teacher"
+dir3CFAnl="05"
+dir4Round="1FirstRound"
+useWeight="SENWGT0"
+scaleList=NULL
+dropItems=NULL
+suffix=NULL
+excludeCNTRY=NULL
+includeImprove=T
+
+###################################################################################################
+
+run.CCCP <- function(dir1Intro,dir2Group,dir3CFAnl,dir4Round,useWeight,scaleList=NULL,dropItems=NULL,suffix=NULL,excludeCNTRY=NULL,includeImprove=F){
+
+  # 1: Prepare names for directory paths and files
+  ## Directory paths
+  ### Full support files path (e.g.country data, scale data, improvement data, CCCP data)
+  dirFSupp <- paste0(dir1Intro,"/",dir2Group,"/2PRG/2Validation/SupportFiles")
+  ### Full CFA path for where to put Mplus input files
+  dirFCFAs <- paste0(dir1Intro,"/",dir2Group,"/4Validation/",dir3CFAnl,"/",dir4Round)
+  
+  ## Files # NAMEs MAY CHANGE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  ### Scale, country, and scale table files
+  nameScale <- paste0("scaleData_",dir2Group,".Rda")
+  nameCntry <- paste0("countryData_",dir2Group,".Rda")
+  nameTable <- paste0("CCCP_tables_",dir2Group,".xlsx")#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  ### Improvement file
+  if(isTRUE(includeImprove)){
+    nameImprv <- paste0("modelImprovements_",dir2Group,".xlsx")
+  }
+  # 2: Prepare data and lists
+  setwd(dirText)
+  load(nameScale)
+  load(nameCntry)
+  # If some countries are excluded...
+  if(!is.null(excludeCNTRY)){
+    # Delete them from the country file 
+    for(row in nrow(cntryData):1){
+      for(cnt in 1:length(excludeCNTRY)){
+        if(cntryData$CountryCode[row]==excludeCNTRY[cnt]){
+          cntryData <- cntryData[-row,]
+        }
+      }
+    }
+    # Rewrite variables with Mplus strings
+    ## Select only variables needed
+    cntryData <- cntryData[,c("Country","CountryAlpha3","CountryCode","ISCED","GroupName","IDEXCLUDE")] # MAY REMOVE "IDEXCLUDE" <<<<<<<<<<<<<<<<<<
+    ## ISCED string: code and name
+    cntryData$ISCEDstring <- ifelse(cntryData$ISCED==1,"1=ISCEDU3",ifelse(cntryData$ISCED==2,"2=ISCED0.2","empty"))
+    ## String of all ISCED levels for the particular country
+    tempCntry <- aggregate(ISCEDstring ~ Country, data=cntryData, paste, collapse=", ", subset=cntryData$IDEXCLUDE==0) # MAY REMOVE "IDEXCLUDE" <<<
+    colnames(tempCntry) <- c("Country","AllISCED")
+    cntryData <- merge(cntryData, tempCntry, all.x=T)
+    ## Country string: code and name
+    cntryData$CountryString <- paste0(cntryData$CountryCode,"=",cntryData$Country)
+    ## String of all countries for the particular ISCED level
+    tempISCED <- aggregate(CountryString ~ ISCED, data=cntryData, paste, collapse=", ", subset=cntryData$IDEXCLUDE==0) # MAY REMOVE "IDEXCLUDE" <<<
+    colnames(tempISCED) <- c("ISCED","AllCountries")
+    cntryData <- merge(cntryData, tempISCED, all.x=T)
+  }
+  # If model improvements are desired, load the data set<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  if(isTRUE(includeImprove)){
+    modelImprv <- read.xlsx(nameImprv, sheet="Improvements", colNames=T)
+  }
+  ###################################################################################################
+  
+  # 3: Create function to write Mplus code for scales
+  ## Create Mplus syntax loop
+  writeMplus <- function(cases,catgr,clust,estmt,fsdtr,idvar,items,itemU,model,path1,path2,scale,splcd,strat,weigt){
+    mplusSyntax   <- 
+      c('TITLE:',
+        '<tabspace>CFA for <scl.name> - Cross Country, Cross Population.',
+        '',
+        'DATA: FILE IS',
+        '<tabspace>"<dta.pth1>',
+        '<tabspace><dta.pth2><scl.name>.dat";',
+        '',
+        'VARIABLE:',
+        '<tabspace>NAMES ARE <id.varbl> IDCNTRY ISCED <stratify> <clusters> <use.wght>',
+        '<tabspace><itm.nams> SUPERGROUPID;',
+        '',
+        '<tabSpace>USEVARIABLES ARE <use.itms>;',
+        '<tabSpace><categrcl>',
+        '<tabSpace>MISSING ARE <use.itms> (9);',
+        '',
+        '<tabspace>AUXILIARY ARE <id.varbl> IDCNTRY ISCED;',
+        '<tabspace>GROUPING IS SUPERGROUPID (<spl.code>);',
+        '',
+        '<tabspace><use.case>',# This is line 19 of the syntax, where the option USEOSERVATIONS may be placed
+        '',
+        '<tabspace>WEIGHT IS <use.wght>;',
+        '<tabspace>STRATIFICATION IS <stratify>;',
+        '<tabspace>CLUSTER IS <clusters>;',
+        '',
+        'ANALYSIS:',
+        '<tabspace>TYPE IS COMPLEX;',
+        '<tabspace>ESTIMATOR IS <estimatr>;',
+        '<tabspace>ITERATIONS ARE 1000',#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        '<tabspace>CONVERGENCE IS 0.001',#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        '',
+        'MODEL:',
+        '',# This is line 32 of the syntax, where the model statement is placed
+        '',
+        'OUTPUT:',
+        '<tabspace>SAMPSTAT STANDARDIZED RESIDUAL TECH1<fs.deter>SVALUES;',
+        '',
+        'SAVEDATA:',
+        '<tabSpace>FILE IS FactorScores_<scl.name>_CCCP<suf.optn>.dat;',
+        '<tabSpace>SAVE IS FSCORES;')
+    
+    ## Replace <categrcl> with catgr
+    mplusSyntax <- gsub("<categrcl>", catgr, mplusSyntax)
+    
+    ## Replace <clusters> with clust
+    mplusSyntax <- gsub("<clusters>", clust, mplusSyntax)
+    
+    ## Replace <dta.pth1> with path1
+    mplusSyntax <- gsub("<dta.pth1>", path1, mplusSyntax)
+    
+    ## Replace <dta.pth2> with path2
+    mplusSyntax <- gsub("<dta.pth2>", path2, mplusSyntax)
+    
+    ## Replace <estimatr> with estmt
+    mplusSyntax <- gsub("<estimatr>", estmt, mplusSyntax)
+    
+    ## Replace <fs.deter> with fsdtr
+    mplusSyntax <- gsub("<fs.deter>", fsdtr, mplusSyntax)
+    
+    ## Replace <id.varbl> with idvar
+    mplusSyntax <- gsub("<id.varbl>", idvar, mplusSyntax)
+    
+    ## Replace <itm.nams> with items
+    mplusSyntax <- gsub("<itm.nams>", items, mplusSyntax)
+    
+    ## Replace <scl.name> with scale
+    mplusSyntax <- gsub("<scl.name>", scale, mplusSyntax)
+    
+    ## Replace <spl.code> with splcd
+    mplusSyntax <- gsub("<spl.code>", splcd, mplusSyntax)
+    
+    ## Replace <stratify> with strat
+    mplusSyntax <- gsub("<stratify>", strat, mplusSyntax)
+    
+    ## Replace <suf.optn> with suffix
+    mplusSyntax <- gsub("<suf.optn>", suffix, mplusSyntax)
+    
+    ## Replace <use.case> with cases
+    mplusSyntax <- gsub("<use.case>", cases, mplusSyntax)
+    
+    ## Replace <use.itms> with itemU
+    mplusSyntax <- gsub("<use.itms>", itemU, mplusSyntax)
+    
+    ## Replace <use.wght> with weigt
+    mplusSyntax <- gsub("<use.wght>", weigt, mplusSyntax)
+    
+    # Insert the model statement
+    mplusSyntax <- c(mplusSyntax[1:31],model,mplusSyntax[33:39])
+    
+    # Remove extra spaces in syntax
+    for(line in length(mplusSyntax):2){
+      if((mplusSyntax[line]=="" & mplusSyntax[line-1]=="") | (mplusSyntax[line]=="" & mplusSyntax[line-1]=="<tabSpace>") | (mplusSyntax[line]=="<tabSpace>" & mplusSyntax[line-1]=="<tabSpace>") | (mplusSyntax[line]=="<tabSpace>" & mplusSyntax[line-1]=="")){
+        mplusSyntax <- mplusSyntax[-line]
+      }
+    }
+    # Ensure no lines are greater than 90 characters
+    mplusSyntax <- paste(strwrap(mplusSyntax, 90, simplify=T), collapse="\n")
+    
+    # Replace <tabSpace> with tabSp
+    mplusSyntax <- gsub("<tabSpace>", tabSp, mplusSyntax)
+    
+    writeLines(text=mplusSyntax, con=filename)
+  }
+  ###################################################################################################
+  
+  # 4: Create replacement strings common to all scales
+  cases <- paste0("USEOBSERVATIONS ARE (",CASES,"); !delete for actual analysis")# Replace 'CASES'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  
+  ## Set fixed replacement variables
+  ### Set correct path folders for the analysis
+  path1 <- paste0(dir1Intro,"/")
+  path2 <- paste0(dir2Group,"/1Data/3Validation/1AddedSuperGroupID/")
+  ### Set spacing variable for "nice looking" Mplus code
+  tabSp <- "     "
+  ### Set weight variable
+  weigt <- useWeight
+  ### Set ID, stratification, and cluster variables
+  if(dir2Group== "Leader"){
+    idvar <- "IDCENTRE"
+    strat <- "BRRCZONE"
+    clust <- "BRRCREP"
+  }
+  if(dir2Group== "Staff"){
+    idvar <- "IDSTAFF"
+    strat <- "BRRSZONE"
+    clust <- "BRRSREP"
+  }
+  ### Set suffix option
+  if(is.null(suffix)){
+    suffix <- ""
+  } else {
+    suffix <- paste0("_",suffix)
+  }
+  ### Create string of unique country/population combinations
+  listSpclID <- c()
+  for(row in 1:nrow(cntryData)){
+    listSpclID <- c(listSpclID, paste0(cntryData$SuperGroupID[row],"=",paste0(cntryData$CountryAlpha3[row],"_ISCED",cntryData$ISCED[row])))# Check var names<<<<<<<<<<<
+  }
+  splcd <- paste(listSpclID, collapse=", ")
+  
+  # 5: Create replacement strings varying among scales
+  setwd(dirFCFAs)
+  ### Get only the scales in the scale list
+  indexScale <- c()
+  if(!is.null(scaleList)){
+    for(row in 1:nrow(scaleData)){
+      if(scaleData$Scale[row] %in% scaleList){
+        indexScale <- c(indexScale, rownames(scaleData)[row])
+      }
+    }
+  } else {
+    scaleList <- scaleData$Scale
+    indexScale <- 1:nrow(scaleData)
+  }
+  indexScale <- as.numeric(indexScale)
+  
+  ### Begin loop for settings specifics for each scale
+  for(ind in indexScale){
+    # Create scale name
+    scale <- scaleData$Scale[ind]
+    # Create item list
+    items <- scaleData$Items[ind]
+    # Delete items not needed
+    if(!is.null(dropItems)){
+      ## Create a list of the items in the scale
+      itemU <- unlist(strsplit(items, " "))
+      ## Scan the dropItems vector for items to drop
+      for(itm in dropItems){
+        ## If an item in the vector dropItems is in the item list of scales...
+        if(itm %in% itemU){
+          ## ...get the index of that item
+          indexItem <- which(itemU %in% itm)
+          ## ...delete it from the item list
+          itemU <- itemU[-c(indexItem)]
+        } else {next}
+      }
+      itemU <- paste0(itemU, collapse=" ") 
+    } else {
+      itemU <- items
+    }
+    # Create "Categorical" Mplus statement
+    if(!is.na(scaleData$Categorical[ind])){
+      catgr <- paste0(scaleData$Categorical[ind],itemU,";")
+      # Modify output statement based on scale
+      fsdtr <- ""
+    } else {
+      catgr <- ""
+      fsdtr <- " FSDETERMINACY "
+    }
+    # Create estimator type Mplus statement
+    estmt <- scaleData$Estimator[ind]
+    
+    # Create model statement
+    # UNIDIMENSIONAL SCALES
+    # If the scale is not multidimensional...
+    if(is.na(scaleData$isMD[ind])){
+      # Create a list of the scale variables
+      itemL <- unlist(strsplit(itemU, " "))
+      # Add "*" after the first element of the scale variables (freeing the parameter)
+      itemL[1] <- paste0(itemL[1], "*")
+      # Recombine the list of scale variables into a string
+      itemL <- paste(itemL, collapse=" ")
+      # Create "BY" statement for the scale
+      modelBY <- paste0(scale, " BY ", itemL, ";")
+      # Create fixed scale variance statement
+      modelSV <- paste0(scale, "@1;")
+      # Create full model statement
+      modelBASE <- c(paste0("<tabSpace>",modelBY), paste0("<tabSpace>",modelSV))
+    } else {
+      # MULTIDIMENSIONAL SCALES
+      # Create temporary lists to store model lines and subscale information
+      tempModel <- c()
+      tempSubsc <- c()
+      # Use a loop to generate the model statement (list of lines)
+      for(row in 1:nrow(scaleData)){
+        # If the MD scale name is in the "inMD" column...
+        if(scaleData$inMD[row] %in% scale){
+          # Get the sub-scale name
+          tempScale <- scaleData$Scale[row]
+          # Get the sub-scale variables
+          tempItems <- scaleData$Items[row]
+          # Delete items not needed
+          if(!is.null(dropItems)){
+            ## Create a list of the items in the scale
+            tempItemU <- unlist(strsplit(tempItems, " "))
+            ## Scan the dropItems vector for items to drop
+            for(itm in dropItems){
+              ## If an item in the vector dropItems is in the item list of scales...
+              if(itm %in% tempItemU){
+                ## ...get the index of that item
+                indexItem <- which(tempItemU %in% itm)
+                ## ...delete it from the item list
+                tempItemU <- tempItemU[-c(indexItem)]
+              } else {next}
+            }
+          } else {
+            tempItemU <- unlist(strsplit(tempItems, ""))
+          }
+          # Add "*" after the first element of the sub-scale variables (freeing the parameter)
+          tempItemU[1] <- paste0(tempItemU[1], "*")
+          # Recombine the list of sub-scale variables into a string
+          tempItemU <- paste(tempItemU, collapse=" ")
+          # Create the "BY" statement for the sub-scale
+          tempModelBY <- paste0(tempScale," BY ",tempItemU,";")
+          # Add this string as a single list element to a temporary list
+          tempModel <- c(tempModel, tempModelBY)
+          # Add the sub-scale name to another temporary list
+          tempSubsc <- c(tempSubsc, tempScale)
+        }
+      }
+      # Use a loop to set each sub-scale's variance to 1
+      for(sub in 1:length(tempSubsc)){
+        tempSubsc[sub] <- paste0(tempSubsc[sub],"@1;") 
+      }
+      # Create full model statement
+      modelBASE <- c(paste0("<tabSpace>",tempModel), paste0("<tabSpace>",tempSubsc))
+    }
+    # Add improvement(s)
+    if(isTRUE(includeImprove)){
+      for(row in 1:nrow(modelImprv)){
+        if(scale %in% modelImprv$Scale[row]){
+          tempImprv <- modelImprv$PooledImprovement[row]
+          if(!is.na(tempImprv)){
+            tempImprv <- unlist(strsplit(tempImprv, "\n"))
+            for(imp in 1:length(tempImprv)){
+              tempImprv[imp] <- paste0("<tabSpace>",tempImprv[imp])
+            }
+            tempImprv <- c("<tabSpace>!Pooled Improvement(s)",tempImprv)
+          } else {
+            tempImprv <- ""
+          }
+        }
+      }
+    } else {
+      tempImprv <- ""
+    }
+    modelBASE <- c(modelBASE, "", tempImprv)
+  }
+  # 6: Import CCCP table
+  scaleTable <- read.xlsx(paste0(dirFSupp,"/",nameTable), sheet=scale , colNames=T, cols=c(1:5))#, rowNames=T)#Check specifications<<<<<<<<<<<<<<<<<<<<
+  for(row in 1:nrow(scaleTable)){
+    for(col in 2:ncol(scaleTable)){
+      if(is.na(scaleTable[row,col])){
+        scaleTable[row,col] <- "X"
+      }
+      scaleTable[row,col] <- toupper(scaleTable[row,col])
+    }
+  }
+  # Create a list of relevant populations for the Mplus syntax
+  listPops <- c()
+  for(row in 1:(nrow(scaleTable)-2)){
+    for(col in 2:(ncol(scaleTable)-1)){
+      if(scaleTable[row,col]!="X"){
+        listPops <- c(listPops, paste0(scaleTable$Country[row],"_",colnames(scaleTable)[col]))
+      }
+    }
+  }
+  # Get UD and MD scales
+  for(scl in 1:nrow(scaleData)){ # Is this the same as the indexScale?<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    if(scaleData$Scale[scl] %in% scale){
+      scaleRow <- as.numeric(scl)
+    }
+  }
+  usedScaleFull <- c()
+  usedScales <- c()
+  if(is.na(scaleData$isMD[ind])){# [ind] is a guess<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    usedScaleFull <- scale
+    usedScales <- substr(gsub("[[:digit:]]+", "", scale),1,6)# Removes numbers?<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  } else {
+    for(scl in 1:nrow(scaleData)){# Should be [ind]?<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+      # If the MD scale name is in the "isMD" column...
+      if(scaleData$inMD[scl] %in% scale){
+        # Get the sub-scale name
+        scaleName <- substr(gsub("[[:digit:]]+", "", scaleData$Scale[scl]),1,6)
+        scaleNameFull <- scaleData$Scale[scl]
+        usedScales <- c(usedScales, scaleName)
+        usedScaleFull <- c(usedScaleFull, scaleNameFull)
+      }
+    }
+  }
+  # Set parameter names
+  modelPrmNm <- c()
+  listVarnc0 <- c()
+  listMeans0 <- c()
+  for(pop in 1:length(listPops)){
+    load1 <- unlist(strsplit(tolower(unlist(strsplit(listPops[pop], "(?<=[a-z])(?=[A-Z])", perl=T))[1]), "_"))[1]
+    #load1 <- unlist(strsplit(tolower(unlist(strsplit(listPops[pop], "-", perl=T))[1]), "_"))[1]<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    load2 <- toupper(letters[as.numeric(substr(listPops[pop], nchar(listPops[pop]), nchar(listPops[pop])))])
+    modelPrmNm <- c(modelPrmNm, paste0("MODEL ",listPops[pop],":"))
+    for(uSc in 1:length(usedScales)){
+      itemScale <- items# IF DELETED what to do?<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+      itemNumbr <- as.numeric(length(unlist(strsplit(itemScale, " "))))
+      intercept <- paste0("[",itemScale,"]")
+      scaleVari <- paste0(usedScaleFull[uSc],"*")
+      scaleMean <- paste0("[",usedScaleFull[uSc],"*]")
+      modelPrmNm <- c(modelPrmNm,
+                      paste0(usedScaleFull[uSc]," BY ",itemL[uSc]," (",usedScales[uSc],load1,load2,"load1-",usedScales[uSc],load1,load2,"load",as.character(itemNumbr),");"),
+                      paste0(intercept," (",usedScales[uSc],load1,load2,"int1-",usedScales[uSc],load1,load2,"int",as.character(itemNumbr),");"),
+                      paste0(scaleVari," (",usedScales[uSc],load1,load2,"var);"),
+                      paste0(scaleMean," (",usedScales[uSc],load1,load2,"mean);"),
+                      "")
+      cntryVari <- paste0(usedScales[uSc],load1,"Bvar")
+      cntryMean <- paste0(usedScales[uSc],load1,"Bmean")
+      listVarnc0 <- c(listVarnc0, cntryVari)
+      listMeans0 <- c(listMeans0, cntryMean)
+    }
+  }
+  listVarnc0 <- unique(listVarnc0)
+  listMeans0 <- unique(listMeans0)
+  listVarnc <- c()
+  listMeans <- c()
+  for(uSc in 1:length(usedScales)){
+    templistVar <- c()
+    templistMns <- c()
+    for(var in 1:length(listVarnc0)){
+      if(grepl(usedScales[uSc], listVarnc0[var])){
+        templistVar <- c(templistVar, listVarnc0[var])
+      }
+    }
+    listVarnc[[as.numeric(uSc)]] <- templistVar
+    for(mns in 1:length(listMeans0)){
+      if(grepl(usedScales[uSc], listMeans0[mns])){
+        templistMns <- c(templistMns, listMeans0[mns])
+      }
+    }
+    listMeans[[as.numeric(uSc)]] <- templistMns
+  }
+  # Mean and variance constraints
+  modelConst1 <- c("MODEL CONSTRAINT:")
+  ## Determine reference population
+  if(scaleTable[(nrow(scaleTable)-1),2]=="C" & scaleTable[(nrow(scaleTable)-1),3]=="C" & scaleTable[(nrow(scaleTable)-1),4]=="C"){
+    refPop <- 2
+  } else {
+    if(scaleTable[(nrow(scaleTable)-1),3]=="S" | scaleTable[(nrow(scaleTable)-1),3]=="M"){
+      refPop <- 2
+    } else {
+      if((scaleTable[(nrow(scaleTable)-1),2]=="S" & scaleTable[(nrow(scaleTable)-1),4]=="S") | (scaleTable[(nrow(scaleTable)-1),2]=="M" & scaleTable[(nrow(scaleTable)-1),4]=="M") | (scaleTable[(nrow(scaleTable)-1),2]=="C" & scaleTable[(nrow(scaleTable)-1),4]=="C")){
+        pop1miss <- 0
+        pop3miss <- 0
+        for(row in 1:(nrow(scaleTable)-2)){
+          if(scaleTable[row,2]=="X"){
+            pop1miss <- pop1miss + 1
+          }
+          if(scaleTable[row,4]=="X"){
+            pop3miss <- pop3miss + 1
+          }
+        }
+        if(pop1miss>pop3miss){
+          refPop <- 3
+        } else {
+          refPop <- 1
+        }
+      } else {
+        if((scaleTable[(nrow(scaleTable)-1),2]=="S" & (scaleTable[(nrow(scaleTable)-1),4]=="M" | scaleTable[(nrow(scaleTable)-1),4]=="C")) | (scaleTable[(nrow(scaleTable)-1),2]=="M" & scaleTable[(nrow(scaleTable)-1),4]=="C")){
+          refPop <- 1
+        } else {
+          if((scaleTable[(nrow(scaleTable)-1),4]=="S" & (scaleTable[(nrow(scaleTable)-1),2]=="M" | scaleTable[(nrow(scaleTable)-1),2]=="C")) | (scaleTable[(nrow(scaleTable)-1),4]=="M" & scaleTable[(nrow(scaleTable)-1),2]=="C")){
+            refPop <- 3
+          }
+        }
+      }
+    }
+  }
+  ## Mean and variance constraints for reference pop
+  if(scaleTable[(nrow(scaleTable)-1),(refPop+1)]=="S"){
+    modelConst1 <- c(modelConst1,paste0("!Model constraints for reference population: ISCED",as.character(refPop)," - Scalar (none)"),"")
+  } else {
+    if(scaleTable[(nrow(scaleTable)-1),(refPop+1)]=="M"){
+      modelConst1 <- c(modelConst1, paste0("!Model constraints for reference population: ISCED",as.character(refPop)," - Metric (means)"))
+      for(row in 1:(nrow(scaleTable)-2)){
+        if(scaleTable[row,(refPop+1)]!="X"){
+          for(uSc in 1:length(usedScales)){
+            load1 <- tolower(scaleTable$Country[row])
+            load2 <- toupper(letters[as.numeric(substr(colnames(scaleTable)[(refPop+1)], nchar(colnames(scaleTable)[(refPop+1)]), nchar(colnames(scaleTable)[(refPop+1)])))])
+            modelConst1 <- c(modelConst1, paste0(usedScales[uSc],load1,load2,"mean = 0;"))
+          }
+        }
+        modelConst1 <- c(modelConst1)#, "")
+      }
+    } else {
+      if(scaleTable[(nrow(scaleTable)-1),(refPop+1)]=="C"){
+        modelConst1 <- c(modelConst1, paste0("!Model constraints for reference population: ISCED",as.character(refPop)),"! - Configural (means and variances)")
+        for(row in 1:(nrow(scaleTable)-2)){
+          if(scaleTable[row,(refPop+1)]!="X"){
+            for(uSc in 1:length(usedScales)){
+              load1 <- tolower(scaleTable$Country[row])
+              load2 <- toupper(letters[as.numeric(substr(colnames(scaleTable)[(refPop+1)], nchar(colnames(scaleTable)[(refPop+1)]), nchar(colnames(scaleTable)[(refPop+1)])))])
+              modelConst1 <- c(modelConst1, paste0(usedScales[uSc],load1,load2,"var = 1;"), paste0(usedScales[uSc],load1,load2,"mean = 0;"))
+            }
+          }
+          modelConst1 <- c(modelConst1, "")# What's the difference between this and above?<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        }
+      }
+    }
+  }
+  ## Mean and variance constraints elsewhere
+  modelConst1 <- c(modelConst1,"!Other model constraints for other populations")
+  for(row in 1:(nrow(scaleTable)-2)){
+    for(col in 2:(ncol(scaleTable)-1)){
+      if(col!=(refPop+1)){
+        if(scaleTable[row,col]!="X"){
+          if(refPop!=2 & scaleTable[row,(refPop+1)]=="X" & col==3){
+            for(uSc in 1:length(usedScales)){
+              load1 <- tolower(scaleTable$Country[row])
+              load2 <- toupper(letters[as.numeric(substr(colnames(scaleTable)[col], nchar(colnames(scaleTable)[col]), nchar(colnames(scaleTable)[col])))])
+              modelConst1 <- c(modelConst1, paste0(usedScales[uSc],load1,load2,"var = 1;"), paste0(usedScales[uSc],load1,load2,"mean = 0;"),"")
+            }
+          } else {
+            for(uSc in 1:length(usedScales)){
+              # Both configural
+              if(scaleTable[row,ncol(scaleTable)]=="C" & scaleTable[(nrow(scaleTable)-1),col]=="C"){
+                load1 <- tolower(scaleTable$Country[row])
+                load2 <- toupper(letters[as.numeric(substr(colnames(scaleTable)[col], nchar(colnames(scaleTable)[col]), nchar(colnames(scaleTable)[col])))])
+                modelConst1 <- c(modelConst1, paste0(usedScales[uSc],load1,load2,"var = 1;"), paste0(usedScales[uSc],load1,load2,"mean = 0;"),"")
+              }
+              # One configural, one metric *OR* both metric
+              if((scaleTable[row,ncol(scaleTable)]=="C" & scaleTable[(nrow(scaleTable)-1),col]=="M") | (scaleTable[row,ncol(scaleTable)]=="M" & scaleTable[(nrow(scaleTable)-1),col]=="C") | (scaleTable[row,ncol(scaleTable)]=="M" & scaleTable[(nrow(scaleTable)-1),col]=="M")){
+                load1 <- tolower(scaleTable$Country[row])
+                load2 <- toupper(letters[as.numeric(substr(colnames(scaleTable)[col], nchar(colnames(scaleTable)[col]), nchar(colnames(scaleTable)[col])))])
+                modelConst1 <- c(modelConst1, paste0("!",usedScales[uSc],load1,load2,"var = 1;"), paste0(usedScales[uSc],load1,load2,"mean = 0;"),"")
+              }
+              # if(scaleTable[row,ncol(scaleTable)]=="M" & scaleTable[(nrow(scaleTable)-1),col]=="C"){
+              #   load1 <- tolower(scaleTable$Country[row])
+              #   load2 <- toupper(letters[as.numeric(substr(colnames(scaleTable)[col], nchar(colnames(scaleTable)[col]), nchar(colnames(scaleTable)[col])))])
+              #   modelConst1 <- c(modelConst1, paste0("!",usedScales[uSc],load1,load2,"var = 1;"), paste0(usedScales[uSc],load1,load2,"mean = 0;"),"")
+              # }
+              # One configural, one scalar *OR* one metric, one scalar *OR* both scalar
+              if((scaleTable[row,ncol(scaleTable)]=="C" & scaleTable[(nrow(scaleTable)-1),col]=="S") | (scaleTable[row,ncol(scaleTable)]=="S" & scaleTable[(nrow(scaleTable)-1),col]=="C") | (scaleTable[row,ncol(scaleTable)]=="M" & scaleTable[(nrow(scaleTable)-1),col]=="S") | (scaleTable[row,ncol(scaleTable)]=="S" & scaleTable[(nrow(scaleTable)-1),col]=="M") | (scaleTable[row,ncol(scaleTable)]=="S" & scaleTable[(nrow(scaleTable)-1),col]=="S")){
+                load1 <- tolower(scaleTable$Country[row])
+                load2 <- toupper(letters[as.numeric(substr(colnames(scaleTable)[col], nchar(colnames(scaleTable)[col]), nchar(colnames(scaleTable)[col])))])
+                modelConst1 <- c(modelConst1, paste0("!",usedScales[uSc],load1,load2,"var = 1;"), paste0("!",usedScales[uSc],load1,load2,"mean = 0;"),"")
+              }
+              # if(scaleTable[row,ncol(scaleTable)]=="S" & scaleTable[(nrow(scaleTable)-1),col]=="C"){
+              #   load1 <- tolower(scaleTable$Country[row])
+              #   load2 <- toupper(letters[as.numeric(substr(colnames(scaleTable)[col], nchar(colnames(scaleTable)[col]), nchar(colnames(scaleTable)[col])))])
+              #   modelConst1 <- c(modelConst1, paste0("!",usedScales[uSc],load1,load2,"var = 1;"), paste0("!",usedScales[uSc],load1,load2,"mean = 0;"),"")
+              # }
+              # # Both metric
+              # if(scaleTable[row,ncol(scaleTable)]=="M" & scaleTable[(nrow(scaleTable)-1),col]=="M"){
+              #   load1 <- tolower(scaleTable$Country[row])
+              #   load2 <- toupper(letters[as.numeric(substr(colnames(scaleTable)[col], nchar(colnames(scaleTable)[col]), nchar(colnames(scaleTable)[col])))])
+              #   modelConst1 <- c(modelConst1, paste0("!",usedScales[uSc],load1,load2,"var = 1;"), paste0(usedScales[uSc],load1,load2,"mean = 0;"),"")
+              # }
+              # # One metric, one scalar
+              # if(scaleTable[row,ncol(scaleTable)]=="M" & scaleTable[(nrow(scaleTable)-1),col]=="S"){
+              #   load1 <- tolower(scaleTable$Country[row])
+              #   load2 <- toupper(letters[as.numeric(substr(colnames(scaleTable)[col], nchar(colnames(scaleTable)[col]), nchar(colnames(scaleTable)[col])))])
+              #   modelConst1 <- c(modelConst1, paste0("!",usedScales[uSc],load1,load2,"var = 1;"), paste0("!",usedScales[uSc],load1,load2,"mean = 0;"),"")
+              # }
+              # if(scaleTable[row,ncol(scaleTable)]=="S" & scaleTable[(nrow(scaleTable)-1),col]=="M"){
+              #   load1 <- tolower(scaleTable$Country[row])
+              #   load2 <- toupper(letters[as.numeric(substr(colnames(scaleTable)[col], nchar(colnames(scaleTable)[col]), nchar(colnames(scaleTable)[col])))])
+              #   modelConst1 <- c(modelConst1, paste0("!",usedScales[uSc],load1,load2,"var = 1;"), paste0("!",usedScales[uSc],load1,load2,"mean = 0;"),"")
+              # }
+              # Both scalar
+              # if(scaleTable[row,ncol(scaleTable)]=="S" & scaleTable[(nrow(scaleTable)-1),col]=="S"){
+              #   load1 <- tolower(scaleTable$Country[row])
+              #   load2 <- toupper(letters[as.numeric(substr(colnames(scaleTable)[col], nchar(colnames(scaleTable)[col]), nchar(colnames(scaleTable)[col])))])
+              #   modelConst1 <- c(modelConst1, paste0("!",usedScales[uSc],load1,load2,"var = 1;"), paste0("!",usedScales[uSc],load1,load2,"mean = 0;"),"")
+              # }
+            }
+          }
+        } else {
+          next
+        }
+      } else {next}
+    }
+  }
+  # Fix average mean and variance
+  modelFixVr <- c("! Fix average variance to 1 (sum of variances to the number of countries):","! for ISCED 2 metric and scalar invariance")
+  modelFixMn <- c("! Fix average latent mean to 0: for ISCED 2 scalar invariance only")
+  for(uSc in 1:length(usedScales)){
+    #itemScale <- scaleData$Vars[which(scaleData$Scale %in% usedScaleFull[uSc])]
+    #itemNumbr <- as.numeric(length(unlist(strsplit(itemScale, " "))))
+    if((scaleTable[(nrow(scaleTable)-1),2]=="M" | scaleTable[(nrow(scaleTable)-1),2]=="S") | (scaleTable[(nrow(scaleTable)-1),3]=="M" | scaleTable[(nrow(scaleTable)-1),3]=="S") | (scaleTable[(nrow(scaleTable)-1),4]=="M" | scaleTable[(nrow(scaleTable)-1),4]=="S")){
+      modelFixVr <- c(modelFixVr, paste0("0 = ",paste(unique(listVarnc[[uSc]]), collapse=" + ")," - ",as.character(length(unique(listVarnc[[uSc]]))-1),";"),"")
+    } else {
+      modelFixVr <- ""
+    }
+    if(scaleTable[(nrow(scaleTable)-1),2]=="S" | scaleTable[(nrow(scaleTable)-1),3]=="S" | scaleTable[(nrow(scaleTable)-1),4]=="S"){
+      modelFixMn <- c(modelFixMn, paste0("0 = ",paste(unique(listMeans[[uSc]]), collapse=" + "),";"),"")
+    } else {
+      modelFixMn <- ""
+    }
+  }
+  # Loading and intercepts constraints
+  modelConst2 <- c()
+  for(col in 2:(ncol(scaleTable)-1)){
+    if(scaleTable[as.numeric(((nrow(scaleTable)-1))),col]=="S"){# Check this "nrow-1" thing<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+      modelConst2 <- c(modelConst2, paste0("!Cross country, scalar ISCED",as.numeric(substr(colnames(scaleTable)[col], nchar(colnames(scaleTable)[col]), nchar(colnames(scaleTable)[col]))),":"),"! (equal loadings, equal intercepts)")
+      indexRow <- which(scaleTable[,col]!="X")
+      indexRow <- as.numeric(indexRow[1])
+      for(row in 1:(nrow(scaleTable)-2)){
+        if(row!=indexRow){
+          if(scaleTable[row,col]!="X"){
+            for(uSc in 1:length(usedScales)){
+              itemScale <- scaleData$Vars[which(scaleData$Scale %in% usedScaleFull[uSc])]
+              itemNumbr <- as.numeric(length(unlist(strsplit(itemScale, " "))))
+              for(num in 1:itemNumbr){
+                load1 <- unlist(strsplit(tolower(unlist(strsplit(scaleTable$Country[indexRow], "(?<=[a-z])(?=[A-Z])", perl=T))[1]), "_"))[1]
+                load2 <- toupper(letters[as.numeric(substr(colnames(scaleTable)[col], nchar(colnames(scaleTable)[col]), nchar(colnames(scaleTable)[col])))])
+                fullLoad1 <- paste0(usedScales[uSc],load1,load2,"load",as.character(num))
+                load3 <- unlist(strsplit(tolower(unlist(strsplit(scaleTable$Country[row], "(?<=[a-z])(?=[A-Z])", perl=T))[1]), "_"))[1]
+                fullLoad2 <- paste0(usedScales[uSc],load3,load2,"load",as.character(num))
+                modelConst2 <- c(modelConst2, paste0(fullLoad1," = ",fullLoad2,";"))
+              }
+              modelConst2 <- c(modelConst2, "")
+            }
+          } else {next}
+        }
+      }
+      for(row in 1:(nrow(scaleTable)-2)){
+        if(row!=indexRow){
+          if(scaleTable[row,col]!="X"){
+            for(uSc in 1:length(usedScales)){
+              itemScale <- scaleData$Vars[which(scaleData$Scale %in% usedScaleFull[uSc])]
+              itemNumbr <- as.numeric(length(unlist(strsplit(itemScale, " "))))
+              for(num in 1:itemNumbr){
+                load1 <- unlist(strsplit(tolower(unlist(strsplit(scaleTable$Country[indexRow], "(?<=[a-z])(?=[A-Z])", perl=T))[1]), "_"))[1]
+                load2 <- toupper(letters[as.numeric(substr(colnames(scaleTable)[col], nchar(colnames(scaleTable)[col]), nchar(colnames(scaleTable)[col])))])
+                fullLoad1 <- paste0(usedScales[uSc],load1,load2,"int",as.character(num))
+                load3 <- unlist(strsplit(tolower(unlist(strsplit(scaleTable$Country[row], "(?<=[a-z])(?=[A-Z])", perl=T))[1]), "_"))[1]
+                fullLoad2 <- paste0(usedScales[uSc],load3,load2,"int",as.character(num))
+                modelConst2 <- c(modelConst2, paste0(fullLoad1," = ",fullLoad2,";"))
+              }
+              modelConst2 <- c(modelConst2, "")
+            }
+          } else {next}
+        }
+      }
+    } else {
+      if(scaleTable[as.numeric(((nrow(scaleTable)-1))),col]=="M"){
+        modelConst2 <- c(modelConst2, paste0("!Cross country, metric ISCED",as.numeric(substr(colnames(scaleTable)[col], nchar(colnames(scaleTable)[col]), nchar(colnames(scaleTable)[col]))),": (equal loadings)"))
+        indexRow <- which(scaleTable[,col]!="X")
+        indexRow <- as.numeric(indexRow[1])
+        for(row in 1:(nrow(scaleTable)-2)){
+          if(row!=indexRow){
+            if(scaleTable[row,col]!="X"){
+              for(uSc in 1:length(usedScales)){
+                itemScale <- scaleData$Vars[which(scaleData$Scale %in% usedScaleFull[uSc])]
+                itemNumbr <- as.numeric(length(unlist(strsplit(itemScale, " "))))
+                for(num in 1:itemNumbr){
+                  load1 <- unlist(strsplit(tolower(unlist(strsplit(scaleTable$Country[indexRow], "(?<=[a-z])(?=[A-Z])", perl=T))[1]), "_"))[1]
+                  load2 <- toupper(letters[as.numeric(substr(colnames(scaleTable)[col], nchar(colnames(scaleTable)[col]), nchar(colnames(scaleTable)[col])))])
+                  fullLoad1 <- paste0(usedScales[uSc],load1,load2,"load",as.character(num))
+                  load3 <- unlist(strsplit(tolower(unlist(strsplit(scaleTable$Country[row], "(?<=[a-z])(?=[A-Z])", perl=T))[1]), "_"))[1]
+                  fullLoad2 <- paste0(usedScales[uSc],load3,load2,"load",as.character(num))
+                  modelConst2 <- c(modelConst2, paste0(fullLoad1," = ",fullLoad2,";"))
+                }
+                modelConst2 <- c(modelConst2, "")
+              }
+            } else {next}
+          }
+        }
+      } else {
+        if(scaleTable[as.numeric(((nrow(scaleTable)-1))),col]=="C"){
+          modelConst2 <- c(modelConst2, paste0("!Cross country, configural ISCED",as.numeric(substr(colnames(scaleTable)[col], nchar(colnames(scaleTable)[col]), nchar(colnames(scaleTable)[col]))),": (no equalities)"))
+        }
+      }
+    }
+  }
+  # Reference country
+  ## Get list of countries that have two populations with identical invariance levels
+  scalarTwoCntry <- c()
+  metricTwoCntry <- c()
+  configTwoCntry <- c()
+  ## Get list of coutries that have all three populations and identical invariance levels
+  scalarFullCntry <- c()
+  metricFullCntry <- c()
+  configFullCntry <- c()
+  for(row in 1:(nrow(scaleTable)-2)){
+    listTemp <- c(scaleTable[row,2], scaleTable[row,3], scaleTable[row,4])
+    for(col in length(listTemp):1){
+      if(listTemp[col]=="X"){
+        listTemp <- listTemp[-col]
+      } else {next}
+    }
+    if(length(listTemp)==1 | length(listTemp)==0){
+      next
+    } else {
+      if(all(sapply(listTemp,function(x){x==listTemp[1]}))){
+        if(length(listTemp)==3){
+          if(all(sapply(listTemp,function(x){x=="S"}))){scalarFullCntry <- c(scalarFullCntry, scaleTable$Country[row])}
+          if(all(sapply(listTemp,function(x){x=="M"}))){metricFullCntry <- c(metricFullCntry, scaleTable$Country[row])}
+          if(all(sapply(listTemp,function(x){x=="C"}))){configFullCntry <- c(configFullCntry, scaleTable$Country[row])}
+        } else {
+          if(all(sapply(listTemp,function(x){x=="S"}))){scalarTwoCntry <- c(scalarTwoCntry, scaleTable$Country[row])}
+          if(all(sapply(listTemp,function(x){x=="M"}))){metricTwoCntry <- c(metricTwoCntry, scaleTable$Country[row])}
+          if(all(sapply(listTemp,function(x){x=="C"}))){configTwoCntry <- c(configTwoCntry, scaleTable$Country[row])}
+        }
+      }
+    }
+  }
+  ## Get the "best" reference country
+  if(!is.null(scalarFullCntry)){
+    refCntry <- scalarFullCntry[1]
+    scalar <- refCntry
+    scalarFullCntry <- scalarFullCntry[-1]
+    load1 <- unlist(strsplit(tolower(unlist(strsplit(refCntry, "(?<=[a-z])(?=[A-Z])", perl=T))[1]), "_"))[1]
+    modelRef <- c(paste0("!Cross population in ",toupper(load1)," (Reference Country: Scalar - "), "! equal loadings, equal intercepts)")
+    for(uSc in 1:length(usedScales)){
+      for(num in 1:itemNumbr){
+        load2 <- paste0(usedScales[uSc],load1,"Bload",as.character(num)," = ",usedScales[uSc],load1,"Aload",as.character(num),";")
+        modelRef <- c(modelRef, load2)
+      }
+      modelRef <- c(modelRef, "")
+      for(num in 1:itemNumbr){
+        load2 <- paste0(usedScales[uSc],load1,"Bload",as.character(num)," = ",usedScales[uSc],load1,"Cload",as.character(num),";")
+        modelRef <- c(modelRef, load2)
+      }
+      modelRef <- c(modelRef, "")
+      for(num in 1:itemNumbr){
+        load2 <- paste0(usedScales[uSc],load1,"Bint",as.character(num)," = ",usedScales[uSc],load1,"Aint",as.character(num),";")
+        modelRef <- c(modelRef, load2)
+      }
+      modelRef <- c(modelRef, "")
+      for(num in 1:itemNumbr){
+        load2 <- paste0(usedScales[uSc],load1,"Bint",as.character(num)," = ",usedScales[uSc],load1,"Cint",as.character(num),";")
+        modelRef <- c(modelRef, load2)
+      }
+      modelRef <- c(modelRef, "")
+    }
+  } else {
+    if(!is.null(metricFullCntry)){
+      refCntry <- metricFullCntry[1]
+      metric <- refCntry
+      metricFullCntry <- metricFullCntry[-1]
+      load1 <- unlist(strsplit(tolower(unlist(strsplit(refCntry, "(?<=[a-z])(?=[A-Z])", perl=T))[1]), "_"))[1]
+      modelRef <- c(paste0("!Cross population in ",load1," (Reference Country: Metric - equal loadings)"))
+      for(uSc in 1:length(usedScales)){
+        for(num in 1:itemNumbr){
+          load2 <- paste0(usedScales[uSc],load1,"Bload",as.character(num)," = ",usedScales[uSc],load1,"Aload",as.character(num),";")
+          modelRef <- c(modelRef, load2)
+        }
+        modelRef <- c(modelRef, "")
+        for(num in 1:itemNumbr){
+          load2 <- paste0(usedScales[uSc],load1,"Bload",as.character(num)," = ",usedScales[uSc],load1,"Cload",as.character(num),";")
+          modelRef <- c(modelRef, load2)
+        }
+        modelRef <- c(modelRef, "")
+      }
+    }
+  }
+  scalarCntry <- c(scalarFullCntry, scalarTwoCntry)
+  metricCntry <- c(metricFullCntry, metricTwoCntry)
+  configCntry <- c(configFullCntry, configTwoCntry)
+  ## Set other countries' equalities
+  if(!is.null(scalarCntry)){
+    for(cnt in 1:length(scalarCntry)){
+      load1 <- unlist(strsplit(tolower(unlist(strsplit(scalarCntry[cnt], "(?<=[a-z])(?=[A-Z])", perl=T))[1]), "_"))[1]
+      modelRef <- c(modelRef, paste0("!Cross population in ",toupper(load1)," (Scalar:"), "! equal loadings, equal intercepts [no cross equalizations])")
+      popNum <- c()
+      cntryRow <- which(scaleTable$Country %in% scalarCntry[cnt])
+      for(col in 2:(ncol(scaleTable)-1)){
+        #if(col!=(refPop+1)){
+        if(length(cntryRow)!=0){
+          if(scaleTable[cntryRow,col]!="X"){
+            popNum <- c(popNum, as.numeric(col))
+          }
+        }
+        #}
+      }
+      if(!is.null(popNum) & length(popNum)!=1){
+        if((refPop+1) %in% popNum){
+          for(pop in 1:length(popNum)){
+            if(popNum[pop]!=(refPop+1)){
+              for(uSc in 1:length(usedScales)){
+                if(scaleTable[(nrow(scaleTable)-1),popNum[pop]]=="S"){
+                  next
+                } else {
+                  if(scaleTable[(nrow(scaleTable)-1),popNum[pop]]=="M"){
+                    for(num in 1:itemNumbr){
+                      load2 <- paste0(usedScales[uSc],load1,toupper(as.character(letters[refPop])),"int",as.character(num)," = ",usedScales[uSc],load1,toupper(as.character(letters[popNum[pop]-1])),"int",as.character(num),";")
+                      modelRef <- c(modelRef, load2)
+                    }
+                    modelRef <- c(modelRef, "")
+                  } else {
+                    if(scaleTable[(nrow(scaleTable)-1),popNum[pop]]=="C"){
+                      for(num in 1:itemNumbr){
+                        load2 <- paste0(usedScales[uSc],load1,toupper(as.character(letters[refPop])),"load",as.character(num)," = ",usedScales[uSc],load1,toupper(as.character(letters[popNum[pop]-1])),"load",as.character(num),";")
+                        modelRef <- c(modelRef, load2)
+                      }
+                      modelRef <- c(modelRef, "")
+                      for(num in 1:itemNumbr){
+                        load2 <- paste0(usedScales[uSc],load1,toupper(as.character(letters[refPop])),"int",as.character(num)," = ",usedScales[uSc],load1,toupper(as.character(letters[popNum[pop]-1])),"int",as.character(num),";")
+                        modelRef <- c(modelRef, load2)
+                      }
+                      modelRef <- c(modelRef, "")
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } else {
+          for(uSc in 1:length(usedScales)){
+            if(scaleTable[cntryRow,5]=="C"){
+              next
+            } else {
+              if(scaleTable[cntryRow,5]=="M"){
+                for(num in 1:itemNumbr){
+                  load2 <- paste0(usedScales[uSc],load1,toupper(as.character(letters[popNum[1]-1])),"load",as.character(num)," = ",usedScales[uSc],load1,toupper(as.character(letters[popNum[2]-1])),"load",as.character(num),";")
+                  modelRef <- c(modelRef, load2)
+                }
+                modelRef <- c(modelRef, "")
+              } else {
+                if(scaleTable[cntryRow,5]=="S"){
+                  for(num in 1:itemNumbr){
+                    load2 <- paste0(usedScales[uSc],load1,toupper(as.character(letters[popNum[1]-1])),"load",as.character(num)," = ",usedScales[uSc],load1,toupper(as.character(letters[popNum[2]-1])),"load",as.character(num),";")
+                    modelRef <- c(modelRef, load2)
+                  }
+                  modelRef <- c(modelRef, "")
+                  for(num in 1:itemNumbr){
+                    load2 <- paste0(usedScales[uSc],load1,toupper(as.character(letters[popNum[1]-1])),"int",as.character(num)," = ",usedScales[uSc],load1,toupper(as.character(letters[popNum[2]-1])),"int",as.character(num),";")
+                    modelRef <- c(modelRef, load2)
+                  }
+                  modelRef <- c(modelRef, "")
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  if(!is.null(metricCntry)){
+    for(cnt in 1:length(metricCntry)){
+      load1 <- unlist(strsplit(tolower(unlist(strsplit(metricCntry[cnt], "(?<=[a-z])(?=[A-Z])", perl=T))[1]), "_"))[1]
+      modelRef <- c(modelRef, paste0("!Cross population in ",toupper(load1)," (Metric: equal loadings [no cross equalizations])"))
+      popNum <- c()
+      cntryRow <- which(scaleTable$Country %in% metricCntry[cnt])
+      for(col in 2:(ncol(scaleTable)-1)){
+        if(col!=(refPop+1)){
+          if(length(cntryRow)!=0){
+            if(scaleTable[cntryRow,col]!="X"){
+              popNum <- c(popNum, as.numeric(col))
+            }
+          }
+        }
+      }
+      if(!is.null(popNum)){
+        for(pop in 1:length(popNum)){
+          for(uSc in 1:length(usedScales)){
+            if(scaleTable[(nrow(scaleTable)-1),popNum[pop]]=="S"){
+              next
+            } else {
+              if(scaleTable[(nrow(scaleTable)-1),popNum[pop]]=="M"){
+                next
+              } else {
+                if(scaleTable[(nrow(scaleTable)-1),popNum[pop]]=="C"){
+                  for(num in 1:itemNumbr){
+                    load2 <- paste0(usedScales[uSc],load1,toupper(as.character(letters[refPop])),"load",as.character(num)," = ",usedScales[uSc],load1,toupper(as.character(letters[popNum[pop]-1])),"load",as.character(num),";")
+                    modelRef <- c(modelRef, load2)
+                  }
+                  modelRef <- c(modelRef, "")
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  if(is.null(scalarFullCntry) & is.null(metricFullCntry) & is.null(scalarCntry) & is.null(metricCntry)){
+    modelRef <- ""
+  }
+  model <- c(model1,"",modelPrmNm,modelConst1,modelFixVr,modelFixMn,modelConst2,modelRef)
+  # Create Scale directory
+  dir.create(paste0(dirFCFAs,"/",scale), showWarnings=T, recursive=T)# Check for 1-4<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  # Set the working directory to the created Scale directory
+  setwd(file.path(dirFCFAs, scale))
+  # Set the filename
+  filename <- paste0(scale,"_CCCP",suffix,".inp")
+  ### Use the function to create the Mplus input in the directory
+  writeMplus(cases,catgr,clust,estmt,fsdtr,idvar,items,itemU,model,path1,path2,scale,splcd,strat,weigt)
+}
+# END
+
+
+
+
+
+#####
