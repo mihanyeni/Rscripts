@@ -1,0 +1,528 @@
+#!usr/bin/Rscript
+
+# Syntax author:   Justin Wild, Ph.D.                            #
+# email:           **************************                    #
+# Affiliation:     ***********                                   #
+# Syntax language: R (3.4.4)                                     #
+# Project:         **********                                    #
+# Analysis:        Testing for Main Study (MS)                   #
+# Last update:     14-Jan-2019                                   #
+
+# Title:   TALIS-3S Cross Study fixed parameter CFA
+# Purpose: Create ************************ cross cycle CFA Mplus input & output with fixed parameters (based on the invariance level of the ISCED 2 population of TALIS)
+
+###################################################################################################
+
+# This script is the located in the following two directories:
+#   Z:\***************\3_MS\Analysis\03Implementation\1PreliminaryAnalysis\ValidationScript
+#   Z:\***************\3_MS\Analysis\03Implementation\2FinalAnalysis\ValidationScript
+
+# The script relies on support files created by the "0b" R scripts found in the same folder
+
+###################################################################################################
+
+run.cross.study.CFA <- function(dir1Intro,dir2Group,dir3CFAnl,dir4Round,useWeight,scaleList=NULL,suffix=NULL,excludeCNTRY=NULL,savedata=F,useMplusAutomation=T){
+  # 1: Prepare names for directory paths and files
+  ## Directory paths
+  ### Full support files path (e.g.country data, scale data, improvement data, MG CFA data)
+  dirFSupp <- paste0(dir1Intro,"/",dir2Group,"/2PRG/2Validation/SupportFiles")
+  ### Full CFA / MG CFA path for where to put Mplus input files
+  dirFCFAs <- paste0(dir1Intro,"/",dir2Group,"/4Validation/",dir3CFAnl,"/",dir4Round)
+  
+  ## Files # NAMEs MAY CHANGE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  ### Scale file
+  nameScale <- paste0("scaleData_",dir2Group,".Rda")
+  ### Country file # Move to second on 1-4, also check line 79 of 1-4<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  if(dir3CFAnl!="01CFAPooled"){
+    nameCntry <- paste0("countryData_",dir2Group,".Rda")
+  }
+  ###################################################################################################
+}
+# 2: Prepare data and lists
+## Read in the support files
+setwd(dirFSupp)
+load(nameScale)
+load(nameCntry)
+# If some countries are excluded...
+if(!is.null(excludeCNTRY)){
+  # Delete them from the country file 
+  for(row in nrow(cntryData):1){
+    for(cnt in 1:length(excludeCNTRY)){
+      if(cntryData$CountryCode[row]==excludeCNTRY[cnt]){
+        cntryData <- cntryData[-row,]
+      }
+    }
+  }
+  # Rewrite variables with Mplus strings
+  ## Select only variables needed
+  cntryData <- cntryData[,c("Country","CountryAlpha3","CountryCode","ISCED","GroupName","IDEXCLUDE")] # MAY REMOVE "IDEXCLUDE" <<<<<<<<<<<<<<<<<<
+  ## ISCED string: code and name
+  cntryData$ISCEDstring <- ifelse(cntryData$ISCED==1,"1=ISCEDU3",ifelse(cntryData$ISCED==2,"2=ISCED0.2","empty"))
+  ## String of all ISCED levels for the particular country
+  tempCntry <- aggregate(ISCEDstring ~ Country, data=cntryData, paste, collapse=", ", subset=cntryData$IDEXCLUDE==0) # MAY REMOVE "IDEXCLUDE" <<<
+  colnames(tempCntry) <- c("Country","AllISCED")
+  cntryData <- merge(cntryData, tempCntry, all.x=T)
+  ## Country string: code and name
+  cntryData$CountryString <- paste0(cntryData$CountryCode,"=",cntryData$Country)
+  ## String of all countries for the particular ISCED level
+  tempISCED <- aggregate(CountryString ~ ISCED, data=cntryData, paste, collapse=", ", subset=cntryData$IDEXCLUDE==0) # MAY REMOVE "IDEXCLUDE" <<<
+  colnames(tempISCED) <- c("ISCED","AllCountries")
+  cntryData <- merge(cntryData, tempISCED, all.x=T)
+}
+###################################################################################################
+
+# 3: Create function to write Mplus code for scales
+## Create Mplus syntax loop
+writeTALISpisaCFA <- function(scale, items, catgr, estmt){
+  mplusSyntax <- # Check space between 'mplusSyntax' and '<-' for 1-4 and 5<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    c('TITLE:',
+      '<tabspace>CFA for <scl.name> - Cross Country, Cross Population.',
+      '',
+      'DATA: FILE IS',
+      '<tabspace>"<dta.pth1>',
+      '<tabspace><dta.pth2><scl.name>.dat";',
+      '',
+      'VARIABLE:',
+      '<tabspace>NAMES ARE <id.varbl> IDCNTRY ISCED <stratify> <clusters> <use.wght>',
+      '<tabspace><itm.nams> SUPERGROUPID;',
+      '',
+      '<tabSpace>USEVARIABLES ARE <use.itms>;',
+      '<tabSpace><categrcl>',
+      '<tabSpace>MISSING ARE <use.itms> (9);',
+      '',
+      '<tabSpace><auxiliar>',
+      '<tabspace>GROUPING IS SUPERGROUPID (<spl.code>);',# Not sure about this<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+      '',
+      '<tabspace><use.case>',# This is line 19 of the syntax, where the option USEOSERVATIONS may be placed
+      '',
+      '<tabspace>WEIGHT IS <use.wght>;',
+      '<tabspace>STRATIFICATION IS <stratify>;',
+      '<tabspace>CLUSTER IS <clusters>;',
+      '',
+      'ANALYSIS:',
+      '<tabspace>TYPE IS COMPLEX;',
+      '<tabspace>ESTIMATOR IS <estimatr>;',
+      '',
+      'MODEL:',
+      '',# This is line 30 of the syntax, where the model statement is placed
+      '',
+      'OUTPUT:',
+      '<tabspace>SAMPSTAT STANDARDIZED RESIDUAL TECH1<fs.deter>SVALUES;',
+      '',
+      '')# This is line 35 of the syntax, where we will place the 'savedata' statement
+  
+  ## Replace <categrcl> with catgr
+  mplusSyntax <- gsub("<categrcl>", catgr, mplusSyntax)
+  
+  ## Replace <clusters> with clust
+  mplusSyntax <- gsub("<clusters>", clust, mplusSyntax)
+  
+  ## Replace <dta.pth1> with path1
+  mplusSyntax <- gsub("<dta.pth1>", path1, mplusSyntax)
+  
+  ## Replace <dta.pth2> with path2
+  mplusSyntax <- gsub("<dta.pth2>", path2, mplusSyntax)
+  
+  ## Replace <estimatr> with estmt
+  mplusSyntax <- gsub("<estimatr>", estmt, mplusSyntax)
+  
+  ## Replace <fs.deter> with fsdtr
+  mplusSyntax <- gsub("<fs.deter>", fsdtr, mplusSyntax)
+  
+  ## Replace <id.varbl> with idvar
+  mplusSyntax <- gsub("<id.varbl>", idvar, mplusSyntax)
+  
+  ## Replace <itm.nams> with items
+  mplusSyntax <- gsub("<itm.nams>", items, mplusSyntax)
+  
+  ## Replace <scl.name> with scale
+  mplusSyntax <- gsub("<scl.name>", scale, mplusSyntax)
+  
+  ## Replace <spl.code> with splcd
+  mplusSyntax <- gsub("<spl.code>", splcd, mplusSyntax)#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  
+  ## Replace <stratify> with strat
+  mplusSyntax <- gsub("<stratify>", strat, mplusSyntax)
+  
+  ## Replace <suf.optn> with suffix
+  mplusSyntax <- gsub("<suf.optn>", suffix, mplusSyntax)
+  
+  ## Replace <use.case> with cases
+  mplusSyntax <- gsub("<use.case>", cases, mplusSyntax)
+  
+  ## Replace <use.itms> with itemU
+  mplusSyntax <- gsub("<use.itms>", itemU, mplusSyntax)
+  
+  ## Replace <use.wght> with weigt
+  mplusSyntax <- gsub("<use.wght>", weigt, mplusSyntax)
+  
+  ## Insert the 'savedata' statment
+  mplusSyntax <- c(mplusSyntax[1:34],sdata)
+  
+  # Insert the model statement
+  if(isTRUE(savedata)){
+    mplusSyntax <- c(mplusSyntax[1:29],model,mplusSyntax[31:37])
+  } else {
+    mplusSyntax <- c(mplusSyntax[1:29],model,mplusSyntax[31:34])
+  }
+  # Remove extra spaces in syntax
+  for(line in length(mplusSyntax):2){
+    if((mplusSyntax[line]=="" & mplusSyntax[line-1]=="") | (mplusSyntax[line]=="" & mplusSyntax[line-1]=="<tabSpace>") | (mplusSyntax[line]=="<tabSpace>" & mplusSyntax[line-1]=="<tabSpace>") | (mplusSyntax[line]=="<tabSpace>" & mplusSyntax[line-1]=="")){
+      mplusSyntax <- mplusSyntax[-line]
+    }
+  }
+  # Ensure no lines are greater than 90 characters
+  mplusSyntax <- paste(strwrap(mplusSyntax, 90, simplify=T), collapse="\n")
+  
+  # Replace <tabSpace> with tabSp
+  mplusSyntax <- gsub("<tabSpace>", tabSp, mplusSyntax)
+  
+  writeLines(text=mplusSyntax, con=filename)
+}
+###################################################################################################
+
+# 3: Write Mplus files to respective scale folders
+## Set fixed replacement variables
+### Set correct path folders for the analysis
+path1 <- paste0(dir1Intro,"/")
+path2 <- paste0(dir2Group,"/1Data/3Validation/1AddedSuperGroupID/")
+### Set spacing variable for "nice looking" Mplus code
+tabSp <- "     "
+### Set weight variable
+weigt <- useWeight
+### Set ID, stratification, and cluster variables
+if(dir2Group== "Leader"){
+  idvar <- "IDCENTRE"
+  strat <- "BRRCZONE"
+  clust <- "BRRCREP"
+}
+if(dir2Group== "Staff"){
+  idvar <- "IDSTAFF"
+  strat <- "BRRSZONE"
+  clust <- "BRRSREP"
+}
+### Set suffix option
+if(is.null(suffix)){
+  suffix <- ""
+} else {
+  suffix <- paste0("_",suffix)
+}
+### Set the savedata option
+if(isTRUE(savedata)){
+  auxil <- "AUXILIARY ARE <id.varbl> IDCNTRY ISCED;"
+  sdata <- c("SAVEDATA:","<tabSpace>FILE IS FactorScores_<scl.name>_Cross-Study<suf.optn>.dat;","<tabSpace>SAVE IS FSCORES;")
+} else {
+  auxil <- ""
+  sdata <- ""
+}
+
+#########<<<<<<<<<<<<<<<<< HERE HERE HERE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+scaleList <- list(c('T3PERUT','S1PERUT','Metric'),c('T3SOCUT','S1SOCUT','Scalar'))
+
+# ### Set the country code grouping statement
+# #### Countries in the 2013 cycle (p. 79 of technical report)
+# cntryLst13 <- c()
+# cntryGroup <- c()
+# cntryList  <- c()
+# for(i in 1:length(cntryLst13)){
+#   for(j in 1:nrow(cntryModfy)){
+#     if(cntryLst13[i] %in% cntryModfy$Country[j]){
+#       cntryGroup <- c(cntryGroup, paste0(cntryModfy$CountryCode[j],"=",cntryModfy$Country[j]))
+#       cntryList  <- c(cntryList, cntryLst13[i])
+#     } else {next}
+#   }
+# }
+# cntryGroup <- toupper(unique(cntryGroup))
+# cntryList  <- toupper(unique(cntryList))
+# ccode <- paste(cntryGroup, collapse=" ")
+# ### Set invariance groups
+# Metric <- c("TECAO","TPERDC","TPRODIV","TSTAKEV","PDLEAD","PJSO")
+# Scalar <- c("TJSO","TPROPD","TSEO","TTSTUD","PCDELV1","PINLEAD")
+
+# ## Create scale folders and replacement strings in the syntax for each respective scale
+# ## Get reduced scale data set
+# scalesInfo18 <- scalesInfo[which(scalesInfo$Name %in% listScales),]
+# library(MplusAutomation)
+
+setwd(dirCFAs)
+for(lst in 1:length(scaleList)){
+  # get row index of scaleData$Name that matches scaleList[[lst]][1]
+  
+  
+  ### Create scale name # These can come from 1-4 script<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  scale <- scalesInfo18$Name[i]
+  ### Create item list
+  items <- scalesInfo18$Vars[i]
+  ### Create "Categorical" Mplus statement
+  if(!is.na(scalesInfo18$MCat[i])){
+    catgr <- paste0(scalesInfo18$MCat[i],scalesInfo18$Vars[i],";")
+  } else {
+    catgr <- ""
+  }
+  ### Create estimator type
+  estmt <- scalesInfo18$MEst[i]
+  # ### Create invariance statement
+  # if(scale %in% Metric){
+  #   invar <- "METRIC"
+  # }
+  # if(scale %in% Scalar){
+  #   invar <- "SCALAR"
+  # }
+  # ### Create modification indices output request
+  modif <- scalesInfo18$ModI[i] # ??? <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  ### Create general model statement
+  
+  #########<<<<<<<<<<<<<<<<< HERE HERE HERE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  
+  ### METRIC MODELS
+  ### 2.5: Create country specific model statement
+  dirTemp <- paste0(dirMtch,"\\",scale)
+  setwd(dirTemp)
+  tempData <- readModels(target=getwd(), recursive=T, what="parameters")
+  tempDSet <- tempData$parameters$unstandardized
+  if(scale %in% Scalar){
+    model <- c()
+    ## Get parameters from any country
+    cntry <- cntryList[1]
+    ## Load country information into temporary data set
+    tempDataC <- as.data.frame(tempDSet[which(tempDSet$Group %in% cntry),])
+    if(nrow(tempDataC)==0){next}
+    ## Create fixed loadings
+    tempScale <- c()
+    for(k in 1:nrow(tempDataC)){
+      if(grepl("BY", tempDataC$paramHeader[k])){
+        tempScale <- c(tempScale, tempDataC$paramHeader[k])
+      }
+    }
+    tempScale <- unique(tempScale)
+    for(k in 1:length(tempScale)){
+      tempScale[k] <- unlist(strsplit(tempScale[k], "[.]"))[1]
+    }
+    tempLoads <- c()
+    for(k in 1:length(tempScale)){
+      tempLoads1 <- c()
+      for(l in 1:nrow(scalesParm)){
+        if(tempScale[k] %in% scalesParm$UDscale13[l]){
+          tempItem18 <- scalesParm$Vars18[l]
+          tempItem13 <- scalesParm$Vars13[l]
+          for(m in 1:nrow(tempDataC)){
+            if((grepl("BY", tempDataC$paramHeader[m])) & (tempItem13 %in% tempDataC$param[m])){
+              tempLoads1 <- c(tempLoads1, paste0(tempItem18,"@",tempDataC$est[m]))
+            } else {
+              next
+            }
+          }
+        } else {
+          next
+        }
+      }
+      scaleTemp <- unique(scalesParm$UDscale18[which(scalesParm$UDscale13 %in% tempScale[k])])
+      scaleTemp <- paste0(scaleTemp," BY ")
+      tempLoads <- c(tempLoads, paste0(scaleTemp, paste(tempLoads1, collapse=" "), ";"))
+    }
+    ## Create fixed intercepts
+    tempIntcp <- c()
+    for(k in 1:length(tempScale)){
+      tempIntcp1 <- c()
+      for(l in 1:nrow(scalesParm)){
+        if(tempScale[k] %in% scalesParm$UDscale13[l]){
+          tempItem18 <- scalesParm$Vars18[l]
+          tempItem13 <- scalesParm$Vars13[l]
+          for(m in 1:nrow(tempDataC)){
+            if((grepl("Intercepts", tempDataC$paramHeader[m])) & (tempItem13 %in% tempDataC$param[m])){
+              tempIntcp1 <- c(tempIntcp1, paste0(tempItem18,"@",tempDataC$est[m]))
+            } else {
+              next
+            }
+          }
+        } else {
+          next
+        }
+      }
+      tempIntcp <- c(tempIntcp, paste0("[", paste(tempIntcp1, collapse=" "), "];"))
+    }
+    ## Create correlation statements
+    tempWiths <- c()
+    for(k in 1:nrow(tempDataC)){
+      tempWiths1 <- c()
+      if(grepl("WITH", tempDataC$paramHeader[k])){
+        for(l in 1:nrow(scalesParm)){
+          if(tempDataC$param[k] %in% scalesParm$Vars13[l]){
+            tempWiths1 <- unlist(strsplit(tempDataC$paramHeader[k], "[.]"))
+            tempWiths1 <- c(tempWiths1, tempDataC$param[k])
+            for(m in 1:length(tempWiths1)){
+              for(n in 1:nrow(scalesParm)){
+                if(tempWiths1[m] %in% scalesParm$Vars13[n]){
+                  tempWiths1[m] <- scalesParm$Vars18[n]
+                } else {next}
+              }
+            }
+            tempWiths1 <- paste0(paste(tempWiths1, collapse=" "), ";")
+          } else {next}
+        }
+      } else {next}
+      tempWiths <- c(tempWiths, tempWiths1)
+    }
+    ## Create statements to free the latent variable means and variances
+    tempMeans <- c()
+    tempMeans1 <- c()
+    tempMeans2 <- c()
+    for(k in 1:length(tempScale)){
+      scaleTemp <- unique(scalesParm$UDscale18[which(scalesParm$UDscale13 %in% tempScale[k])])
+      tempMeans3 <- paste0(scaleTemp,"*;")
+      tempMeans1 <- c(tempMeans1,tempMeans3)
+      tempMeans4 <- paste0("[",scaleTemp,"*];")
+      tempMeans2 <- c(tempMeans2,tempMeans4)
+    }
+    tempMeans <- c(tempMeans1,tempMeans2)
+    ## Release latent mean of the first group
+    tempCntry <- c()
+    ## Get country
+    cntry <- cntryList[1]
+    ## Load country information into temporary data set
+    tempDataC <- as.data.frame(tempDSet[which(tempDSet$Group %in% cntry),])
+    ## Create model statement intro
+    tempCntry1 <- paste0("MODEL ",cntry, ":")
+    ## Release latent mean
+    tempCntry <- c(tempCntry1, tempMeans2)
+    ## Create full statement
+    model <- c("",tempLoads,"",tempIntcp,"",tempWiths,"",tempMeans,"",tempCntry)
+  }
+  if(scale %in% Metric){
+    # Create model statement
+    model <- c()
+    ## Get parameters from any country
+    cntry <- cntryList[1]
+    ## Load country information into temporary data set
+    tempDataC <- as.data.frame(tempDSet[which(tempDSet$Group %in% cntry),])
+    if(nrow(tempDataC)==0){next}
+    ## Create fixed loadings
+    tempScale <- c()
+    for(k in 1:nrow(tempDataC)){
+      if(grepl("BY", tempDataC$paramHeader[k])){
+        tempScale <- c(tempScale, tempDataC$paramHeader[k])
+      }
+    }
+    tempScale <- unique(tempScale)
+    for(k in 1:length(tempScale)){
+      tempScale[k] <- unlist(strsplit(tempScale[k], "[.]"))[1]
+    }
+    tempLoads <- c()
+    for(k in 1:length(tempScale)){
+      tempLoads1 <- c()
+      for(l in 1:nrow(scalesParm)){
+        if(tempScale[k] %in% scalesParm$UDscale13[l]){
+          tempItem18 <- scalesParm$Vars18[l]
+          tempItem13 <- scalesParm$Vars13[l]
+          for(m in 1:nrow(tempDataC)){
+            if((grepl("BY", tempDataC$paramHeader[m])) & (tempItem13 %in% tempDataC$param[m])){
+              tempLoads1 <- c(tempLoads1, paste0(tempItem18,"@",tempDataC$est[m]))
+            } else {
+              next
+            }
+          }
+        } else {
+          next
+        }
+      }
+      scaleTemp <- unique(scalesParm$UDscale18[which(scalesParm$UDscale13 %in% tempScale[k])])
+      scaleTemp <- paste0(scaleTemp," BY ")
+      tempLoads <- c(tempLoads, paste0(scaleTemp, paste(tempLoads1, collapse=" "), ";"))
+    }
+    ## Create correlation statements
+    tempWiths <- c()
+    for(k in 1:nrow(tempDataC)){
+      tempWiths1 <- c()
+      if(grepl("WITH", tempDataC$paramHeader[k])){
+        for(l in 1:nrow(scalesParm)){
+          if(tempDataC$param[k] %in% scalesParm$Vars13[l]){
+            tempWiths1 <- unlist(strsplit(tempDataC$paramHeader[k], "[.]"))
+            tempWiths1 <- c(tempWiths1, tempDataC$param[k])
+            for(m in 1:length(tempWiths1)){
+              for(n in 1:nrow(scalesParm)){
+                if(tempWiths1[m] %in% scalesParm$Vars13[n]){
+                  tempWiths1[m] <- scalesParm$Vars18[n]
+                } else {next}
+              }
+            }
+            tempWiths1 <- paste0(paste(tempWiths1, collapse=" "), ";")
+          } else {next}
+        }
+      } else {next}
+      tempWiths <- c(tempWiths, tempWiths1)
+    }
+    ## Create statements to free the latent variable means and variances
+    tempMeans <- c()
+    tempMeans1 <- c()
+    tempMeans2 <- c()
+    for(k in 1:length(tempScale)){
+      scaleTemp <- unique(scalesParm$UDscale18[which(scalesParm$UDscale13 %in% tempScale[k])])
+      tempMeans3 <- paste0(scaleTemp,"*;")
+      tempMeans1 <- c(tempMeans1,tempMeans3)
+    }
+    tempMeans <- c(tempMeans1)
+    ## Create country statements
+    tempCntry <- c()
+    for(j in 1:length(cntryList)){
+      ## Get country
+      cntry <- cntryList[j]
+      ## Load country information into temporary data set
+      tempDataC <- as.data.frame(tempDSet[which(tempDSet$Group %in% cntry),])
+      if(nrow(tempDataC)==0){next}
+      ## Create model statement intro
+      tempCntry1 <- paste0("MODEL ",cntry, ":")
+      ## Create fixed intercepts
+      tempIntcp <- c()
+      for(k in 1:length(tempScale)){
+        tempIntcp1 <- c()
+        for(l in 1:nrow(scalesParm)){
+          if(tempScale[k] %in% scalesParm$UDscale13[l]){
+            tempItem18 <- scalesParm$Vars18[l]
+            tempItem13 <- scalesParm$Vars13[l]
+            for(m in 1:nrow(tempDataC)){
+              if((grepl("Intercepts", tempDataC$paramHeader[m])) & (tempItem13 %in% tempDataC$param[m])){
+                tempIntcp1 <- c(tempIntcp1, paste0(tempItem18,"@",tempDataC$est[m]))
+              } else {
+                next
+              }
+            }
+          } else {
+            next
+          }
+        }
+        tempIntcp <- c(tempIntcp, paste0("[", paste(tempIntcp1, collapse=" "), "];"))
+      }
+      tempMeans2 <- c()
+      for(k in 1:length(tempScale)){
+        scaleTemp <- unique(scalesParm$UDscale18[which(scalesParm$UDscale13 %in% tempScale[k])])
+        tempMeans4 <- paste0("[",scaleTemp,"*];")
+        tempMeans2 <- c(tempMeans2,tempMeans4)
+      }
+      tempCntry <- c(tempCntry,tempCntry1,tempIntcp,tempMeans2,"")
+    }
+    ## Create full statement
+    model <- c("",tempLoads,"",tempWiths,"",tempMeans,"",tempCntry)
+  }
+  ### Create Scale directory
+  #dir.create(paste(dirCFAs, scale, sep="\\"), showWarnings=T, recursive=T)
+  dir.create(paste("X:\\*************************_34CrossCycleBugTesting", scale, sep="\\"), showWarnings=T, recursive=T)
+  ### Set the working directory to the created Scale directory
+  #setwd(file.path(dirCFAs, scale))
+  setwd(file.path("X:\\*************************_34CrossCycleBugTesting", scale))
+  ### Use the function to create the Mplus input in the directory
+  writeTALISpisaCFA(scale, items, catgr, estmt)
+}
+###################################################################################################
+
+# 6: Run all the Mplus input files recursively to generate CFA output
+setwd(dirCFAs)
+system.time({runModels(getwd(), recursive=T)})
+
+# End
+
+
+
+
+
+#####
