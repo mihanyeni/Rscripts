@@ -1,0 +1,114 @@
+#!usr/bin/Rscript
+
+library(shiny)
+library(openxlsx)
+####################################################################################################
+
+ui <- fluidPage(
+  # Title
+  titlePanel("Testing R Shiny Abilities..."),
+  # Sidebar layout
+  sidebarLayout(
+    # Sidebar
+    sidebarPanel(
+      fileInput(inputId="setupFile", label="Choose a SET UP file", multiple=F, accept=".xlsx"),
+      # Create a panel that only pops up after the file uploads
+      # It reads the scales and creates a scale list
+      conditionalPanel(
+        condition="output.fileUploaded",
+        uiOutput(outputId="scaleCheckboxes"),
+        # This submits "input.scaleCheckboxes"
+        actionButton(inputId="submitScaleList", label="Submit scale list")
+      )
+    ),
+    mainPanel(
+      # Create a panel that only pops up after the scale list is submitted
+      # It reads the items based on the scales chosen
+      conditionalPanel(
+        condition="input.scaleCheckboxes",
+        wellPanel(
+          tags$h1("Choose scale items"),
+          uiOutput(outputId="itemsCheckboxes"),
+          # This submits "input.itemCheckboxes"
+          actionButton(inputId="submitItems",label="Submit items")
+        )
+      ),
+      # Create a panel that only pops up after the items are submitted
+      # It prints text based on the items chosen
+      conditionalPanel(
+        condition="input.scaleCheckboxes",
+        textOutput(outputId="textOutputField")
+      )
+    )
+  )
+)
+
+server <- function(input, output){
+  # Make the input dataset 'reactive' to be able to use in other UIs
+  filedata <- reactive({
+    infile <- input$setupFile
+    if(is.null(infile)){
+      return(NULL)
+    } else {
+      read.xlsx(infile$datapath, sheet="Scales", startRow=1, colNames=T, rowNames=F)
+    }
+  })
+  # Create a statement that recognizes when the file is uploaded
+  output$fileUploaded <- reactive({
+    return(!is.null(filedata()))
+  })
+  outputOptions(output, "fileUploaded", suspendWhenHidden=F)
+  # Create UI for selecting the scale list
+  output$scaleCheckboxes <- renderUI({
+    if(is.null(filedata())){
+      return(NULL)
+    } else {
+      checkboxGroupInput(inputId="scaleCheckboxes", label="Select scale list", choices=unique(filedata()$Scale))
+    }
+  })
+  # Create UI for the item selection panel
+  ## Create a 'reactive event' for when the "submitScaleList" action button is clicked
+  itemLists <- eventReactive(input$submitScaleList, {
+    scaleInputField <- lapply(input$scaleCheckboxes, function(scl){
+      checkboxGroupInput(inputId=paste0("items_",scl), label=paste("Select items to drop from ", scl),
+                         choices=unlist(strsplit(filedata()$Items[filedata()$Scale %in% scl], " ")))
+    })
+    scaleInputField
+  })
+  ## Call the event "itemList" to create 'item lists' UI
+  output$itemsCheckboxes <- renderUI({
+    if(is.null(filedata())){
+      return(NULL)
+    } else if(!is.null(filedata()) & length(input$scaleCheckboxes>0)){
+      itemLists()
+    }
+  })
+  # Create output text
+  ## Create a 'reactive event' for when the "submitItems" action button is clicked
+  textFromInputs <- eventReactive(input$submitItems, {
+    textInputField <- lapply(input$scaleCheckboxes, function(scl){
+      printscale <- scl
+      printitems <- paste((eval(substitute(input$x, list(x=as.name(paste0("items_",scl)))))), collapse=" ")
+      # print(paste0("For the scale ",printscale," you have dropped the item(s) ",printitems,"."))
+      filename <- paste0("test_",scl)
+      source("Z:/LSCE/General/Analysis/01Planning/02_ShinyPrep/sourceTest.R")
+      setwd("Z:/LSCE/General/Analysis/01Planning/02_ShinyPrep/files")
+      run.source.test(printscale, printitems, filename)
+      paste0("Scale ",scl," is done!")
+    })
+    textInputField
+  })
+  output$textOutputField <- renderUI({
+    textFromInputs()
+  })
+}
+
+shinyApp(ui=ui, server=server)
+
+# END
+
+
+
+
+
+#####
