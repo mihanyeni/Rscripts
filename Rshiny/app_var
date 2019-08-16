@@ -1,0 +1,64 @@
+#!usr/bin/Rscript
+
+# datasets
+load("Z:/LSCE/General/Analysis/03Preparation/00_RShinyTesting/Studies/3S/05Implementation/4Rscripts/SupportFiles/dfCntry_Staff.Rda")
+load("Z:/LSCE/General/Analysis/03Preparation/00_RShinyTesting/Studies/3S/05Implementation/4Rscripts/SupportFiles/dfScale_Staff.Rda")
+
+nameStudy                   <- "Test"
+dirRawData                  <- "Z:/LSCE/General/Analysis/03Preparation/00_RShinyTesting"
+dirSource                   <- "Z:/LSCE/General/Analysis/03Preparation/00_RShinyTesting/SourceScripts"
+dirSetup                    <- "Z:/LSCE/General/Analysis/03Preparation/00_RShinyTesting"
+dirRoot                     <- "Z:/LSCE/General/Analysis/03Preparation/00_RShinyTesting/Studies/3S/05Implementation"
+dirReport                   <- "Z:/LSCE/General/Analysis/03Preparation/00_RShinyTesting/Studies/3S/06Reporting"
+
+selectionCountryCodeVar     <- "IDCNTRY"
+selectionLevelCodeVar       <- "ISCED"
+selectionTargetLevelCode    <- "2"
+selectionPopCodeVar         <- "IDPOP"
+
+selectionAdjudicateVar      <- "None"
+selectionAdjudicateCode     <- "1"
+selectionWeight             <- "SENWGT0"
+selectionIDVars             <- "IDBOOK IDCLASS"
+
+selectionAnalysisPhase      <- "Preliminary Analysis"
+selectionAnalysis           <- "Pooled CFA"
+selectionRound              <- "First Models"
+selectionGroup              <- "Staff"
+selectionGroupCodeVar       <- "IDSTAFF"
+selectionStrat              <- "BRRSZONE"
+selectionCluster            <- "BRRZREP"
+
+dirAnalysisPhase            <- "1PreliminaryAnalysis/"
+dirGroup                    <- "1Staff/"
+dirAnalysis                 <- "1PooledCFA/"
+dirRound                    <- "1FirstModels/"
+
+selectionImprove            <- "No"
+selectionFS                 <- "Yes"
+selectionMplusAuto          <- "No"
+
+selectionGlobalDropCountry  <- "None"
+selectionGlobalDropLevel    <- "None"
+selectionGlobalDropPop      <- "None"
+
+selectionListScale          <- "S1MD"
+selectionListScalePI        <- "None"
+
+selectionScale              <- "S1MD"
+selectionScaleDropItems     <- "None"
+selectionScaleDropSpecifics <- "None"
+selectionScaleDropCountry   <- "None"
+selectionScaleDropLevel     <- "None"
+selectionScaleDropPop       <- "None"
+
+selectionFilename           <- "S1MD_PooledCFA"
+selectionSuffix             <- "v1"
+
+# END
+
+
+
+
+
+#####
