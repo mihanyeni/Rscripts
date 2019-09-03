@@ -1,0 +1,1435 @@
+#!usr/bin/Rscript
+
+####################################################################################################
+#######################################   USER INTERFACE   #########################################
+####################################################################################################
+
+ui <- fluidPage(
+  # Title
+  tags$head(tags$style(".title {margin: auto; width: 750px}")),
+  tags$div(class="title", titlePanel(tags$h1("Create and Run CFA/MGCFA Mplus Files"))),
+  # Choose the setup file
+  tags$h2("Choose the study's set up file"),#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Change the name 'set up' and 'setup'? <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  ## Read in the setup file...
+  fileInput(inputId="fileSetup", label=tags$h4("Choose set up Excel file"), multiple=F, accept=".xlsx"),
+  
+  ################################################
+  
+  # GLOBAL OPTIONS FIELD
+  # ...and (1) then choose the global options in a panel that appears after the file is uploaded
+  conditionalPanel(
+    condition="output.uploadedFileSetup",
+    # These UIs are produced after the setup file is uploaded
+    tags$h2("Select global options"),
+    wellPanel(
+      # 01. Select analysis phase (e.g. preliminary analysis, final analysis)
+      uiOutput(outputId="selectAnalysisPhase"),
+      # 02. Select scaling analysis (e.g. pooled, single pop, MGCFA)
+      uiOutput(outputId="selectAnalysis"),
+      # 03. Select the round of the CFA analysis
+      uiOutput(outputId="selectRound"),
+      # 04. Select population group (e.g. teachers, principals, students)
+      uiOutput(outputId="selectGroup")
+    ),
+    # Other options
+    tags$h3("Other options"),
+    wellPanel(
+      # 05. Select weight variable
+      uiOutput(outputId="selectWeight"),
+      # 06. Using adjudication variable
+      uiOutput(outputId="radioAdjudicateVar"),
+      # 07. Including improvements
+      uiOutput(outputId="radioImprove"),
+      # 08. Create factor scores
+      uiOutput(outputId="radioFS"),
+      # 09. Run Mplus input files
+      uiOutput(outputId="radioMplusAuto"),
+      # 10. Add filename suffix
+      uiOutput(outputId="radioSuffix"),
+      # 11. Write filename suffix
+      conditionalPanel(
+        condition="input.radioSuffix=='Yes'",
+        uiOutput(outputId="writeSuffix")
+      )
+    ),
+    # Dropping options
+    tags$h3("Options for dropping cases: these will be dropped for all scales"),
+    wellPanel(
+      # 12. Button to select/deselect all the "None" dropping options
+      actionButton(inputId="selectNoDropping", label='Select/deselect "None" for all dropping options'),
+      # 13. Dropping countries
+      uiOutput(outputId="selectCountry"),
+      # 14. Dropping levels
+      uiOutput(outputId="selectLevel"),
+      # 15. Dropping populations 
+      uiOutput(outputId="selectPop")
+    ),
+    # Submit global inputs
+    fluidRow(
+      column(12,
+             wellPanel(
+               actionButton(inputId="submitGlobalOptions", label="Submit global options")
+             )
+      )
+    ),
+    #####################
+    
+    conditionalPanel(
+      condition="input.submitGlobalOptions",
+      # Generate warning messages if above inputs are not appropriate
+      fluidRow(
+        column(4,
+               wellPanel(
+                 # 16. Warning for dropped countries
+                 uiOutput(outputId="warningGlobalDropCountry")
+               )
+        ),
+        column(4,
+               wellPanel(
+                 # 17. Warning for dropped levels
+                 uiOutput(outputId="warningGlobalDropLevel")
+               )
+        ),
+        column(4,
+               wellPanel(
+                 # 18. Warning for dropped populations
+                 uiOutput(outputId="warningGlobalDropPop")
+               )
+        )
+      ),
+      # Generate message for the user
+      fluidRow(
+        column(12,
+               wellPanel(
+                 tags$h4("If you have no warnings, please scroll down to select scale options")
+               )
+        )
+      )
+    )
+  ),
+  ################################################
+  
+  # SCALE OPTIONS FIELD
+  # ...and (2) then choose the scale options in a panel that appears after global options are submitted
+  conditionalPanel(
+    condition="input.submitGlobalOptions",
+    tags$h2("Select scales for analysis"),
+    wellPanel(
+      # 19. Button to select/deselect all scales
+      actionButton(inputId="selectallScales", label="Select/deselect all scales"),
+      # 20. Select scales
+      uiOutput(outputId="checkboxesScale"),
+      # This submits "input.checkboxesScale" to read in the scale list
+      actionButton(inputId="submitScaleList", label="Submit scale list")
+    )
+  ),
+  conditionalPanel(
+    condition="input.submitScaleList",
+    tags$h2("Select scale options"),
+    wellPanel(
+      tags$h3("Select scales that have datasets with Phantom Indicators"),
+      # 21. Button to select/deselect all scales that have Phantom Indicators in their respective datasets
+      actionButton(inputId="selectallPIs", label="Select/deselect all scales"),
+      # 22. Select scales that have Phantom Indicators in their respective datasets
+      uiOutput(outputId="checkboxesScalePI"),
+      # This submits "input.checkboxesScalePI" to read in the scale list
+      actionButton(inputId="submitScalePIList", label="Submit scales with Phantom Indicators")
+    )
+  ),
+  conditionalPanel(
+    condition="input.submitScalePIList",
+    wellPanel(
+      tags$h3("Select scales for further dropping options (e.g. items, countries)"),
+      # 23. Button to select/deselect all scales that need additional dropping options
+      actionButton(inputId="selectallDropOptions", label="Select/deselect all scales"),
+      # 24. Select scales that need additional dropping options
+      uiOutput(outputId="checkboxesScaleDropOption"),
+      # This submits "input.checkboxesScaleDropOptions" to read in the scale list
+      actionButton(inputId="submitScaleDropOptionList", label="Submit scales for additional dropping options")
+    )
+  ),
+  # These UIs are produced after the scale list for scales that need additional dropping options is sumbitted
+  conditionalPanel(
+    condition="input.submitScaleDropOptionList",
+    tags$h2("Select scale dropping options"),
+    wellPanel(
+      # 25. Scale dropping options, part 1: items, specific items for specific populations, countries, and levels (if applicable)
+      uiOutput(outputId="selectionScaleDropOptions1")
+    ),
+    wellPanel(
+      # 26. Scale dropping options, part 2: populations (if applicable)
+      uiOutput(outputId="selectionScaleDropOptions2")
+    )
+  ),
+  #######################
+  
+  conditionalPanel(
+    condition="input.submitScaleDroppingOptions",
+    # Generate warning messages if above inputs are not appropriate
+    fluidRow(
+      column(6,
+             wellPanel(
+               # 27. Warning for scales with Phantom Indicators
+               uiOutput(outputId="warningScalePI"),
+               # 28. Warning function for scales with Phantom Indicators
+               uiOutput(outputId="warningFunScalePI")
+             )
+      ),
+      column(6,
+             wellPanel(
+               # 29. Warning for scales that need more dropping options
+               uiOutput(outputId="warningScaleDropOption"),
+               # 30. Warning function for scales that need more dropping options
+               uiOutput(outputId="warningFunScaleDropOption")
+             )
+      )
+    ),
+    fluidRow(
+      column(6,
+             wellPanel(
+               # 31. Warning for dropped items
+               uiOutput(outputId="warningScaleDropItem")
+             )
+      ),
+      column(6,
+             wellPanel(
+               # 32. Warning function for dropped items
+               uiOutput(outputId="warningFunScaleDropItem")
+             )
+      )
+    ),
+    fluidRow(
+      column(6,
+             wellPanel(
+               # 33. Warning for specific population dropped items
+               uiOutput(outputId="warningScaleSpecificDropItem")
+             )
+      ),
+      column(6,
+             wellPanel(
+               # 34. Warning function for specific population dropped items
+               uiOutput(outputId="warningFunScaleSpecificDropItem")
+             )
+      )
+    ),
+    fluidRow(
+      column(4,
+             wellPanel(
+               # 35. Warning for dropped countries
+               uiOutput(outputId="warningScaleDropCountry"),
+               # 36. Warning function for dropped countries
+               uiOutput(outputId="warningFunScaleDropCountry")
+             )
+      ),
+      column(4,
+             wellPanel(
+               # 37. Warning for dropped levels
+               uiOutput(outputId="warningScaleDropLevel"),
+               # 38. Warning function for dropped levels
+               uiOutput(outputId="warningFunScaleDropLevel")
+             )
+      ),
+      column(4,
+             wellPanel(
+               # 39. Warning for dropped populations
+               uiOutput(outputId="warningScaleDropPop"),
+               # 40. Warning function for dropped populations
+               uiOutput(outputId="warningFunScaleDropPop")
+             )
+      )
+    ),
+    # Generate message for the user
+    fluidRow(
+      column(12,
+             wellPanel(
+               tags$h4("If you have no warnings, please scroll down to run the script")
+             )
+      )
+    ),
+    # Run source files
+    fluidRow(
+      column(12,
+             wellPanel(
+               actionButton(inputId="submitAnalysisOptions", label="Submit all analysis options")
+             )
+      )
+    )
+  ),
+  ################################################
+  
+  conditionalPanel(
+    condition="input.submitAnalysisOptions",
+    tags$h2("R output"),
+    # 41. R output notes
+    fluidRow(
+      column(12,
+             wellPanel(
+               uiOutput(outputId="Routput") #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< How to make live R console? <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+             )
+      )
+    )
+  )
+)
+####################################################################################################
+#######################################       SERVER       #########################################
+####################################################################################################
+
+server <- function(input, output, session){
+  # Create datasets from the set up file
+  ## Make the setup dataset 'reactive' for use in other UIs
+  dfSetup <- reactive({
+    infile <- input$fileSetup
+    if(is.null(infile)){
+      return(NULL)
+    } else {
+      read.xlsx(infile$datapath, sheet="SetUp", startRow=1, colNames=T, rowNames=F, rows=1:21, cols=c(3,5:15), skipEmptyRows=F)
+    }
+  })
+  ## Make the country dataset 'reactive' for use in other UIs
+  dfCntry <- reactive({
+    infile <- input$fileSetup
+    if(is.null(infile)){
+      return(NULL)
+    } else {
+      read.xlsx(infile$datapath, sheet="Country", startRow=1, colNames=T, rowNames=F)
+    }
+  })
+  # Create a statement that recognizes when the file is uploaded to produce conditional UIs
+  output$uploadedFileSetup <- reactive({
+    return(!is.null(dfSetup()))
+  })
+  outputOptions(output, "uploadedFileSetup", suspendWhenHidden=F)
+  
+  ################################################
+  
+  # GLOBAL OPTIONS FIELD
+  # 01. Create UI for selecting the analysis phase (e.g. preliminary analysis, final analysis)
+  output$selectAnalysisPhase <- renderUI({
+    if(is.null(dfSetup())){
+      return(NULL)
+    } else if(!is.null(dfSetup()) & length(unique(na.omit(dfSetup()$AnalysisPhase)))>1){
+      selectInput(inputId="selectAnalysisPhase", label=tags$h4("Select the analysis phase"), choices=unique(na.omit(dfSetup()$AnalysisPhase)))
+    } else {
+      # Ignore if only one population group is given in the setup file
+      return(NULL)
+    }
+  })
+  # 02. Create UI for selecting the type of CFA analysis (e.g. pooled, single pop, MGCFA)
+  output$selectAnalysis <- renderUI({
+    if(is.null(dfSetup())){
+      return(NULL)
+    } else {
+      # Create a vector of analysis types that were selected in the setup file
+      cfas <- c()
+      # Count non-missing values in the "AnalysisType" column
+      noMissing <- length(na.omit(dfSetup()$AnalysisCheck))
+      for(row in 1:noMissing){
+        if(dfSetup()$AnalysisCheck[row]=="TRUE"){
+          cfas <- c(cfas,dfSetup()$AnalysisType[row])
+        }
+      }
+      if(length(unique(na.omit(cfas)))>1){
+        selectInput(inputId="selectAnalysis", label=tags$h4("Select the type of analysis"), choices=cfas)
+      } else {
+        # Ignore if only one analysis type is selected in the setup file
+        return(NULL)
+      }
+    }
+  })
+  # 03. Create UI for selecting the round of the CFA analysis
+  output$selectRound <- renderUI({
+    if(is.null(dfSetup())){
+      return(NULL)
+    } else {
+      selectInput(inputId="selectRound", label=tags$h4("Select the round of the analysis"), choices=unique(na.omit(dfSetup()$Round)))
+    }
+  })
+  # 04. Create UI for selecting the population group (e.g. teachers, principals, students)
+  output$selectGroup <- renderUI({
+    if(is.null(dfSetup())){
+      return(NULL)
+    } else if(!is.null(dfSetup()) & length(unique(na.omit(dfSetup()$Group)))>1){
+      selectInput(inputId="selectGroup", label=tags$h4("Select the group for analysis"), choices=unique(na.omit(dfSetup()$Group)))
+    } else {
+      # Ignore if only one population group is given in the setup file
+      return(NULL)
+    }
+  })
+  ## Make the scale dataset 'reactive' for use in other UIs
+  dfScale <- reactive({
+    infile <- input$fileSetup
+    if(is.null(infile)){
+      return(NULL)
+    } else if(!is.null(dfSetup()) & length(unique(na.omit(dfSetup()$Group)))>1){
+      read.xlsx(infile$datapath, sheet=paste0("Scale_",gsub(" ","",input$selectGroup)), startRow=1, colNames=T, rowNames=F)
+    } else {
+      read.xlsx(infile$datapath, sheet=paste0("Scale_",dfSetup()$Group[1]), startRow=1, colNames=T, rowNames=F)
+    }
+  })
+  # Create UIs for choosing other options
+  # 05. Create UI for selecting the weight variable
+  output$selectWeight <- renderUI({
+    if(is.null(dfSetup())){
+      return(NULL)
+    } else {
+      # Create a vector of weight variables given in the setup file
+      listWeights <- unique(na.omit(dfSetup()$Weight))
+      if(length(listWeights)>1){
+        selectInput(inputId="selectWeight", label=tags$h4("Select the weight variable"), choices=unique(na.omit(dfSetup()$Weight)))
+      } else {
+        # Ignore if only one weight variable is given in the setup file
+        return(NULL)
+      }
+    }
+  })
+  # 06. Using adjudication variable
+  output$radioAdjudicateVar <- renderUI({
+    if(is.null(dfSetup())){
+      return(NULL)
+    } else if(!is.null(dfSetup()) & !is.na(dfSetup()$FixedInformation[9])){
+      radioButtons(inputId="radioAdjudicateVar", label=tags$h4(paste0('Should the adjudication variable "',dfSetup()$FixedInformation[9],'" be used for selecting cases?')), c("No","Yes"), inline=T)
+    } else {
+      return(NULL)
+    }
+  })
+  # 07. Including improvements
+  output$radioImprove <- renderUI({
+    if(is.null(dfSetup())){
+      return(NULL)
+    } else {
+      radioButtons(inputId="radioImprove", label=tags$h4("Should model improvements be included in the model?"), c("No","Yes"), inline=T)
+    }
+  })
+  # 08. Create factor scores
+  ## Make conditional on the type of analysis
+  appearRadioFS <- eventReactive(input$selectAnalysis, {
+    if(input$selectAnalysis=="Cross-country MGCFA with MI testing" | input$selectAnalysis=="Cross-level  MGCFA with MI testing"){
+      return(tags$div(tags$hr(),tags$h4("Note: Factor scores cannot be produced for the type of analysis selected"),tags$hr())) # Keep or leave blank? <<<<<<<<<<<<<<<<<<<<<<<<
+    } else {
+      radioButtons(inputId="radioFS", label=tags$h4("Should factor scores be produced from the model?"), c("No","Yes"), inline=T)
+    }
+  })
+  output$radioFS <- renderUI({
+    if(is.null(dfSetup())){
+      return(NULL)
+    } else {
+      appearRadioFS()
+    }
+  })
+  # 09. Run Mplus input files
+  output$radioMplusAuto <- renderUI({
+    if(is.null(dfSetup())){
+      return(NULL)
+    } else {
+      radioButtons(inputId="radioMplusAuto", label=tags$h4("Should Mplus outputs be produced?"), c("No","Yes"), inline=T)
+    }
+  })
+  # 10. Add filename suffix
+  output$radioSuffix <- renderUI({
+    if(is.null(dfSetup())){
+      return(NULL)
+    } else {
+      radioButtons(inputId="radioSuffix", label=tags$h4("Do you want to include a common filename suffix for the Mplus input files?"), c("No","Yes"), inline=T)
+    }
+  })
+  # 11. Write filename suffix
+  output$writeSuffix <- renderUI({
+    if(is.null(dfSetup())){
+      return(NULL)
+    } else {
+      textInput(inputId="writeSuffix", label=tags$h4("Please write the suffix here:"), value="")
+    }
+  })
+  # Create UIs for dropping options
+  # 13. Dropping countries
+  output$selectCountry <- renderUI({
+    if(is.null(dfCntry())){
+      return(NULL)
+    } else {
+      selectInput(inputId="selectCountry", label=tags$h4("Select countries to drop"), choices=c("None", sort(unique(na.omit(dfCntry()$CountryAlpha3)))), selectize=T, multiple=T)
+    }
+  })
+  ## Store remaining countries for use in future UIs
+  remainCountryCurrent <- reactiveVal(NULL)
+  observeEvent(input$selectCountry, {
+    listCountry <- sort(unique(na.omit(dfCntry()$CountryAlpha3)))
+    remainCountry <- c()
+    for(cnt in 1:length(listCountry)){
+      if(!(listCountry[cnt] %in% input$selectCountry)){
+        remainCountry <- c(remainCountry, listCountry[cnt])
+      }
+    }
+    remainCountryCurrent(remainCountry)
+  })
+  # 14. Dropping levels (e.g. ISCED levels, POP levels [e.g. U3, ISCED level 02])
+  output$selectLevel <- renderUI({
+    if(is.null(dfCntry())){
+      return(NULL)
+    } else if(!is.null(dfCntry()) & is.na(dfCntry()$Level[1])){
+      # Ignore if no levels are given in the setup file
+      return(NULL)
+    } else {
+      selectInput(inputId="selectLevel", label=tags$h4("Select levels to drop"), choices=c("None", sort(unique(na.omit(dfCntry()$Level)))), selectize=T, multiple=T)
+    }
+  })
+  ## Store remaining levels for use in future UIs
+  remainLevelCurrent <- reactiveVal(NULL)
+  observeEvent(input$selectLevel, {
+    listLevel <- sort(unique(na.omit(dfCntry()$Level)))
+    remainLevel <- c()
+    for(lvl in 1:length(listLevel)){
+      if(!(listLevel[lvl] %in% input$selectLevel)){
+        remainLevel <- c(remainLevel, listLevel[lvl])
+      }
+    }
+    remainLevelCurrent(remainLevel)
+  })
+  # 15. Dropping populations
+  output$selectPop <- renderUI({
+    if(is.null(dfCntry())){
+      return(NULL)
+    } else if(!is.null(dfCntry()) & is.na(dfCntry()$Level[1])){
+      # Ignore if no levels are given in the setup file
+      return(NULL)
+    } else {
+      selectInput(inputId="selectPop", label=tags$h4("Select populations to drop"), choices=c("None", sort(unique(na.omit(dfCntry()$Pop)))), selectize=T, multiple=T)
+    }
+  })
+  ## Store selected populations
+  selectPopCurrent <- reactiveVal(NULL)
+  observeEvent(input$selectPop, {selectPopCurrent(input$selectPop)})
+  ## Store remaining populations for use in future UIs
+  remainPopCurrent <- reactiveVal(NULL)
+  observeEvent(input$selectPop, {
+    pops <- sort(unique(na.omit(dfCntry()$Pop)))
+    # Get individual populations remaining after country and level exclusions
+    remainingPops <- c()
+    listChosenCountries <- c()
+    listChosenLevels    <- c()
+    for(cnt1 in 1:length(dfCntry()$CountryAlpha3)){
+      if(!(dfCntry()$CountryAlpha3[cnt1] %in% input$selectCountry)){
+        listChosenCountries <- c(listChosenCountries, dfCntry()$CountryAlpha3[cnt1])
+      }
+    }
+    for(lvl1 in 1:length(dfCntry()$Level)){
+      if(!(dfCntry()$Level[lvl1] %in% input$selectLevel)){
+        listChosenLevels <- c(listChosenLevels, dfCntry()$Level[lvl1])
+      }
+    }
+    listChosenCountries <- na.omit(listChosenCountries)
+    listChosenLevels    <- na.omit(listChosenLevels)
+    for(cnt2 in 1:length(listChosenCountries)){
+      for(lvl2 in 1:length(listChosenLevels)){
+        remainingPops <- c(remainingPops,paste0(listChosenCountries[cnt2],"_",listChosenLevels[lvl2]))
+      }
+    }
+    remainingPops <- unique(na.omit(remainingPops))
+    # Delete populations not in the study
+    finalPops <- c()
+    for(pop in 1:length(remainingPops)){
+      if(remainingPops[pop] %in% pops){
+        finalPops <- c(finalPops, remainingPops[pop])
+      }
+    }
+    listPop <- finalPops
+    remainPop <- c()
+    for(pop in 1:length(listPop)){
+      if(!(listPop[pop] %in% input$selectPop)){
+        remainPop <- c(remainPop, listPop[pop])
+      }
+    }
+    remainPop <- sort(remainPop)
+    remainPopCurrent(remainPop)
+  })
+  ## Change the choices and selected values of "selectPop" depending on the selected values of "selectCountry" and "selectLevel"
+  observeEvent(c(input$selectCountry, input$selectLevel), {
+    pops <- sort(unique(na.omit(dfCntry()$Pop)))
+    # Get individual populations remaining after country and level exclusions
+    remainingPops <- c()
+    listChosenCountries <- c()
+    listChosenLevels    <- c()
+    for(cnt1 in 1:length(dfCntry()$CountryAlpha3)){
+      if(!(dfCntry()$CountryAlpha3[cnt1] %in% input$selectCountry)){
+        listChosenCountries <- c(listChosenCountries, dfCntry()$CountryAlpha3[cnt1])
+      }
+    }
+    for(lvl1 in 1:length(dfCntry()$Level)){
+      if(!(dfCntry()$Level[lvl1] %in% input$selectLevel)){
+        listChosenLevels <- c(listChosenLevels, dfCntry()$Level[lvl1])
+      }
+    }
+    listChosenCountries <- na.omit(listChosenCountries)
+    listChosenLevels    <- na.omit(listChosenLevels)
+    for(cnt2 in 1:length(listChosenCountries)){
+      for(lvl2 in 1:length(listChosenLevels)){
+        remainingPops <- c(remainingPops,paste0(listChosenCountries[cnt2],"_",listChosenLevels[lvl2]))
+      }
+    }
+    remainingPops <- unique(na.omit(remainingPops))
+    # Delete populations not in the study
+    finalPops <- c()
+    for(pop in 1:length(remainingPops)){
+      if(remainingPops[pop] %in% pops){
+        finalPops <- c(finalPops, remainingPops[pop])
+      }
+    }
+    # Change the user selected populations based on the new possibilities
+    selectedPops <- c()
+    if(is.null(selectPopCurrent())){
+      # If there are no user selected populations, select "None"
+      selectedPops <- "None"
+      # If the only selection was "None", select "None"
+    } else if(selectPopCurrent()=="None"){
+      selectedPops <- "None"
+    } else {
+      for(pop in 1:length(selectPopCurrent())){
+        if(selectPopCurrent()[pop] %in% finalPops){
+          selectedPops <- c(selectedPops, selectPopCurrent()[pop])
+        }
+      }
+      if(length(selectedPops)==0){
+        # If all user selected populations are deleted, select ""
+        selectedPops <- ""
+      }
+    }
+    updateSelectInput(session, inputId="selectPop", tags$h4("Select populations to drop"), choices=c("None", finalPops), selected=selectedPops)
+  })
+  # 12. Use button to update dropping selection
+  observe({
+    if(input$selectNoDropping==0){return(NULL)} 
+    else if(input$selectNoDropping%%2==0){ #modulus operator "%%" gives the remainder of a division of the first number by the second
+      updateSelectInput(session, inputId="selectCountry", label=tags$h4("Select countries to drop"), choices=c("None", sort(unique(na.omit(dfCntry()$CountryAlpha3)))))
+      updateSelectInput(session, inputId="selectLevel", label=tags$h4("Select levels to drop"), choices=c("None", sort(unique(na.omit(dfCntry()$Level)))))
+      updateSelectInput(session, inputId="selectPop", label=tags$h4("Select populations to drop"), choices=c("None", sort(unique(na.omit(dfCntry()$Pop)))))
+    } else {
+      updateSelectInput(session, inputId="selectCountry", label=tags$h4("Select countries to drop"), choices=c("None", sort(unique(na.omit(dfCntry()$CountryAlpha3)))), selected="None")
+      updateSelectInput(session, inputId="selectLevel", label=tags$h4("Select levels to drop"), choices=c("None", sort(unique(na.omit(dfCntry()$Level)))), selected="None")
+      updateSelectInput(session, inputId="selectPop", label=tags$h4("Select populations to drop"), choices=c("None", sort(unique(na.omit(dfCntry()$Pop)))), selected="None")
+    }
+  })
+  #######################
+  
+  # Create 'reactive' events for when the "submitGlobalOptions" action button is clicked to create warning messages
+  # 16. Warning for dropped countries
+  textWarningGlobalDropCountry <- eventReactive(input$submitGlobalOptions, {
+    # Compile vector lists of dropped countries
+    warningGlobalDropCountry <- unlist(strsplit(paste(input$selectCountry, collapse="; "), "; "))
+    # Print warning statements
+    if(length(warningGlobalDropCountry)>1 & "None" %in% warningGlobalDropCountry){
+      tags$h5('WARNING: For dropped countries, both "None" and some countries were selected. Please revise your selection and click the "Submit global options" button again.', br(), tags$h5("Ruh-roh!"), tags$img(src="RuhRoh.jpg", height="100%", width="100%"))
+    } else if(length(warningGlobalDropCountry)==0){
+      tags$h5('WARNING: For dropped countries, no option was selected. Please revise your selection and click the "Submit global options" button again.', br(), tags$h5("Ruh-roh!"), tags$img(src="RuhRoh.jpg", height="100%", width="100%"))
+    } else {tags$h5("Dropped countries are OK!", br(), tags$h5("Relax :o)"), tags$img(src="Relax.jpeg", height="100%", width="100%"))}
+  })
+  output$warningGlobalDropCountry <- renderUI({
+    textWarningGlobalDropCountry()
+  })
+  # 17. Warning for dropped levels
+  textWarningGlobalDropLevel <- eventReactive(input$submitGlobalOptions, {
+    if(is.na(dfCntry()$Level[1])){
+      return(NULL)
+    } else {
+      # Compile vector lists of dropped levels
+      warningGlobalDropLevel <- unlist(strsplit(paste(input$selectLevel, collapse="; "), "; "))
+      # Print warning statements
+      if(length(warningGlobalDropLevel)>1 & "None" %in% warningGlobalDropLevel){
+        tags$h5('WARNING: For dropped levels, both "None" and some levels were selected. Please revise your selection and click the "Submit global options" button again.', br(), tags$h5("Ruh-roh!"), tags$img(src="RuhRoh.jpg", height="100%", width="100%"))
+      } else if(length(warningGlobalDropLevel)==0){
+        tags$h5('WARNING: For dropped levels, no option was selected. Please revise your selection and click the "Submit global options" button again.', br(), tags$h5("Ruh-roh!"), tags$img(src="RuhRoh.jpg", height="100%", width="100%"))
+      } else {tags$h5("Dropped levels are OK!", br(), tags$h5("Relax :o)"), tags$img(src="Relax.jpeg", height="100%", width="100%"))}
+    }
+  })
+  output$warningGlobalDropLevel <- renderUI({
+    if(is.null(dfCntry())){
+      return(NULL)
+    } else if(!is.null(dfCntry()) & is.na(dfCntry()$Level[1])){
+      tags$h5("Nothing to report: (No levels in the study)")
+    } else {
+      textWarningGlobalDropLevel()
+    }
+  })
+  # 18. Warning for dropped populations
+  textWarningGlobalDropPop <- eventReactive(input$submitGlobalOptions, {
+    if(is.na(dfCntry()$Level[1])){
+      return(NULL)
+    } else {
+      # Compile vector lists of dropped populations
+      warningGlobalDropPop <- unlist(strsplit(paste(input$selectPop, collapse="; "), "; "))
+      # Print warning statements
+      if(length(warningGlobalDropPop)>1 & "None" %in% warningGlobalDropPop){
+        tags$h5('WARNING: For dropped populations, both "None" and some populations were selected. Please revise your selection and click the "Submit global options" button again.', br(), tags$h5("Ruh-roh!"), tags$img(src="RuhRoh.jpg", height="100%", width="100%"))
+      } else if(length(warningGlobalDropPop)==0){
+        tags$h5('WARNING: For dropped populations, no option was selected. Please revise your selection and click the "Submit global options" button again.', br(), tags$h5("Ruh-roh!"), tags$img(src="RuhRoh.jpg", height="100%", width="100%"))
+      } else {tags$h5("Dropped populations are OK!", br(), tags$h5("Relax :o)"), tags$img(src="Relax.jpeg", height="100%", width="100%"))}
+    }
+  })
+  output$warningGlobalDropPop <- renderUI({
+    if(is.null(dfCntry())){
+      return(NULL)
+    } else if(!is.null(dfCntry()) & is.na(dfCntry()$Level[1])){
+      tags$h5("Nothing to report: (No populations in the study)")
+    } else {
+      textWarningGlobalDropPop()
+    }
+  })
+  ################################################
+  
+  # SCALE OPTIONS FIELD
+  # 20. Create UI for selecting the scales
+  output$checkboxesScale <- renderUI({
+    if(is.null(dfScale())){
+      return(NULL)
+    } else {
+      checkboxGroupInput(inputId="checkboxesScale", label="", choices=unique(dfScale()$Scale), inline=T)
+    }
+  })
+  ## Store selected scales for use in future UIs
+  selectScalesCurrent <- reactiveVal(NULL)
+  observeEvent(input$submitScaleList, {selectScalesCurrent(input$checkboxesScale)})
+  # 19. Use button to update scale selection
+  observe({
+    if(input$selectallScales==0){return(NULL)} 
+    else if(input$selectallScales%%2==0){
+      updateCheckboxGroupInput(session, inputId="checkboxesScale", choices=unique(dfScale()$Scale), inline=T)
+    }
+    else{
+      updateCheckboxGroupInput(session, inputId="checkboxesScale", choices=unique(dfScale()$Scale), selected=unique(dfScale()$Scale), inline=T)
+    }
+  })
+  # 22. Create UI for selecting scales that have Phantom Indicators in their respective datasets
+  ## Create input
+  output$checkboxesScalePI <- renderUI({
+    if(is.null(dfScale())){
+      return(NULL)
+    } else {
+      checkboxGroupInput(inputId="checkboxesScalePI", label="", choices=c("None", selectScalesCurrent()), selected="None", inline=T)
+    }
+  })
+  ## Store selected scales with Phantom Indicators
+  selectPICurrent <- reactiveVal(NULL)
+  observeEvent(input$checkboxesScalePI, {selectPICurrent(input$checkboxesScalePI)})
+  ## Change selectable scales with Phantom Indicators based on an updated scale list
+  observeEvent(input$submitScaleList, {
+    selectedPIs <- c()
+    if(is.null(selectPICurrent())){
+      # If there are no user selected scales with Phantom Indicators, select "None"
+      selectedPIs <- "None"
+    } else {
+      for(scl in 1:length(selectPICurrent())){
+        if(selectPICurrent()[scl] %in% selectScalesCurrent()){
+          selectedPIs <- c(selectedPIs, selectPICurrent()[scl])
+        }
+      }
+      if(length(selectedPIs)==0){
+        # If all user selected selected scales with Phantom Indicators are deleted, select "None"
+        selectedPIs <- "None"
+      }
+    }
+    updateCheckboxGroupInput(session, inputId="checkboxesScalePI", choices=c("None", selectScalesCurrent()), selected=selectedPIs, inline=T)
+  })
+  # 21. Use button to update scale selection
+  observe({
+    if(input$selectallPIs==0){return(NULL)}
+    else if(input$selectallPIs%%2==0){
+      isolate(updateCheckboxGroupInput(session, "checkboxesScalePI", choices=c("None", selectScalesCurrent()), selected="None", inline=T))
+    }
+    else{
+      isolate(updateCheckboxGroupInput(session, "checkboxesScalePI", choices=c("None", selectScalesCurrent()), selected=input$checkboxesScale, inline=T))
+    }
+  })
+  # 24. Create UI for selecting scales that need additional dropping options
+  output$checkboxesScaleDropOption <- renderUI({
+    if(is.null(dfScale())){
+      return(NULL)
+    } else {
+      checkboxGroupInput(inputId="checkboxesScaleDropOption", label="", choices=c("None", selectScalesCurrent()), selected="None", inline=T)
+    }
+  })
+  ## Store selected scales that need additional dropping options
+  selectDropOptionCurrent <- reactiveVal(NULL)
+  observeEvent(input$checkboxesScaleDropOption, {selectDropOptionCurrent(input$checkboxesScaleDropOption)})
+  ## Change selectable scales that need additional dropping options based on an updated scale list
+  observeEvent(input$submitScaleList, {
+    selectedDropOptions <- c()
+    if(is.null(selectDropOptionCurrent())){
+      # If there are no user selected scales that need additional dropping options, select "None"
+      selectedDropOptions <- "None"
+    } else {
+      for(scl in 1:length(selectDropOptionCurrent())){
+        if(selectDropOptionCurrent()[scl] %in% selectScalesCurrent()){
+          selectedDropOptions <- c(selectedDropOptions, selectDropOptionCurrent()[scl])
+        }
+      }
+      if(length(selectedDropOptions)==0){
+        # If all user selected selected scales that need additional dropping options are deleted, select "None"
+        selectedDropOptions <- "None"
+      }
+    }
+    updateCheckboxGroupInput(session, inputId="checkboxesScaleDropOption", choices=c("None", selectScalesCurrent()), selected=selectedDropOptions, inline=T)
+  })
+  # 23. Use button to update scale selection
+  observe({
+    if(input$selectallDropOptions==0){return(NULL)} 
+    else if(input$selectallDropOptions%%2==0){
+      isolate(updateCheckboxGroupInput(session, "checkboxesScaleDropOption", choices=c("None", selectScalesCurrent()), selected="None", inline=T))
+    }
+    else{
+      isolate(updateCheckboxGroupInput(session, "checkboxesScaleDropOption", choices=c("None", selectScalesCurrent()), selected=input$checkboxesScale, inline=T))
+    }
+  })
+  # 25. Scale dropping options, part 1: items, specific items for specific populations, countries, and (if applicable) levels
+  ## Create a 'reactive' event for when the "submitScaleDropOptionList" action button is clicked
+  scaleOptionsList1 <- eventReactive(input$submitScaleDropOptionList, {
+    if(input$checkboxesScaleDropOption[1]=="None"){
+      return(NULL)
+    } else if(is.na(dfCntry()$Level[1])){
+      scaleOptionsInput1 <- lapply(input$checkboxesScaleDropOption, function(scl){
+        # Create the selection inputs for the dropping options of each scale
+        tags$div(tags$h3(paste0("Options for ",scl)),
+                 # Dropping items
+                 checkboxGroupInput(inputId=paste0("dropItems_",scl), label=tags$h4("Select items to drop"), choices=c("None",unlist(strsplit(dfScale()$Items[dfScale()$Scale %in% scl], " "))), selected="None", inline=T),
+                 # Dropping items for specific populations
+                 textInput(inputId=paste0("specificPopDropItems_",scl), label=tags$div(tags$h4(paste0("If there are specific countries, levels, or populations that need additional dropped items for the scale ",scl,", please write them here:")),tags$h5(tags$b(tags$i('Please use the format "Country/Level/Population1: Item1, Item2; Country/Level/Population2: Item3, Item4"'))),tags$h5(tags$b(tags$i('Example: "DEU: BSBG01A, BSBG01B; ISCED3: BSBG01A; AUS_ISCED1: BSBG01D, BSBG01F"')))), value=""),
+                 # Dropping countries
+                 selectInput(inputId=paste0("dropCountries_",scl), label=tags$h4("Select countries to drop"), choices=c("None", remainCountryCurrent()), selectize=T, multiple=T),
+                 tags$hr()
+        )
+      })
+      scaleOptionsInput1
+    } else {
+      scaleOptionsInput1 <- lapply(input$checkboxesScaleDropOption, function(scl){
+        # Create the selection inputs for the dropping options of each scale
+        tags$div(tags$h3(paste0("Options for ",scl)),
+                 # Dropping items
+                 checkboxGroupInput(inputId=paste0("dropItems_",scl), label=tags$h4("Select items to drop"), choices=c("None",unlist(strsplit(dfScale()$Items[dfScale()$Scale %in% scl], " "))), selected="None", inline=T),
+                 # Dropping items for specific populations
+                 textInput(inputId=paste0("specificPopDropItems_",scl), label=tags$div(tags$h4(paste0("If there are specific countries, levels, or populations that need additional dropped items for the scale ",scl,", please write them here:")),tags$h5(tags$b(tags$i('Please use the format "Country/Level/Population1: Item1, Item2; Country/Level/Population2: Item3, Item4"'))),tags$h5(tags$b(tags$i('Example: "DEU: BSBG01A, BSBG01B; ISCED3: BSBG01A; AUS_ISCED1: BSBG01D, BSBG01F"')))), value=""),
+                 # Dropping countries
+                 selectInput(inputId=paste0("dropCountries_",scl), label=tags$h4("Select countries to drop"), choices=c("None", remainCountryCurrent()), selectize=T, multiple=T),
+                 # Dropping levels
+                 selectInput(inputId=paste0("dropLevels_",scl), label=tags$h4("Select levels to drop"), choices=c("None", remainLevelCurrent()), selectize=T, multiple=T),
+                 tags$hr()
+        )
+      })
+      scaleOptionsInput1
+    }
+  })
+  ## Create UI for part 1 of the scale dropping options
+  output$selectionScaleDropOptions1 <- renderUI({
+    if(is.null(dfScale())){
+      return(NULL)
+    } else if(input$checkboxesScaleDropOption[1]=="None"){
+      tags$div(
+        tags$h3("Very well, you have selected no scales for additional dropping options. Please click the button below"),
+        actionButton(inputId="submitScaleDroppingOptions", label="Click me :o)"))
+    } else if(!is.null(dfScale()) & length(input$checkboxesScaleDropOption)>0){
+      if(is.na(dfCntry()$Level[1])){
+        tags$div(scaleOptionsList1(),
+                 actionButton(inputId="submitScaleDroppingOptions", label="Submit all scale dropping options"))
+      } else {
+        tags$div(scaleOptionsList1(),
+                 actionButton(inputId="submitScaleDroppingOptionsPart1", label="Submit all scale dropping options, part 1"))
+      }
+    }
+  })
+  # 26. Scale dropping options, part 2: populations (if applicable) #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Keep user selections if they have to go back? <<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  ## Create a 'reactive' event for when the "submitScaleDroppingOptionsPart1" action button is clicked
+  scaleOptionsList2 <- eventReactive(input$submitScaleDroppingOptionsPart1, {
+    if(is.na(dfCntry()$Level[1])){
+      return(NULL)
+    } else {
+      scaleOptionsInput2 <- lapply(input$checkboxesScaleDropOption, function(scl){
+        # Get individual populations remaining after country and level exclusions
+        remainingPops  <- c()
+        listChosenCountries <- c()
+        listChosenLevels    <- c()
+        for(cnt1 in 1:length(dfCntry()$CountryAlpha3)){
+          if(!(dfCntry()$CountryAlpha3[cnt1] %in% eval(substitute(input$z, list(z=as.name(paste0("dropCountries_",scl))))))){
+            listChosenCountries <- c(listChosenCountries, dfCntry()$CountryAlpha3[cnt1])
+          }
+        }
+        for(lvl1 in 1:length(dfCntry()$Level)){
+          if(!(dfCntry()$Level[lvl1] %in% eval(substitute(input$z, list(z=as.name(paste0("dropLevels_",scl))))))){
+            listChosenLevels <- c(listChosenLevels, dfCntry()$Level[lvl1])
+          }
+        }
+        listChosenCountries <- na.omit(listChosenCountries)
+        listChosenLevels    <- na.omit(listChosenLevels)
+        for(cnt2 in 1:length(listChosenCountries)){
+          for(lvl2 in 1:length(listChosenLevels)){
+            remainingPops <- c(remainingPops,paste0(listChosenCountries[cnt2],"_",listChosenLevels[lvl2]))
+          }
+        }
+        remainingPops <- unique(na.omit(remainingPops))
+        # Delete populations not in the study
+        finalPops <- c()
+        for(pop in 1:length(remainingPops)){
+          if(remainingPops[pop] %in% remainPopCurrent()){
+            finalPops <- c(finalPops, remainingPops[pop])
+          }
+        }
+        finalPops <- sort(finalPops)
+        # Create the inputs for dropped-populations-by-scale selection panel
+        selectInput(inputId=paste0("dropPops_",scl), label=tags$h4(paste0("Select populations to drop from ",scl)), choices=c("None", finalPops), selectize=T, multiple=T)
+      })
+      scaleOptionsInput2
+    }
+  })
+  output$selectionScaleDropOptions2 <- renderUI({
+    if(is.null(dfScale())){
+      return(NULL)
+    } else if(!is.null(dfScale()) & is.na(dfCntry()$Level[1])){
+      return(NULL)
+    } else if(!is.null(dfScale()) & !is.na(dfCntry()$Level[1]) & length(input$checkboxesScaleDropOption>0)){
+      tags$div(tags$h3("Select scale dropping options, part 2"),
+               scaleOptionsList2(),
+               actionButton(inputId="submitScaleDroppingOptions", label="Submit all scale dropping options"))
+    }
+  })
+  #######################
+  
+  # Create 'reactive' events for when the "submitScaleDroppingOptions" action button is clicked to create warning messages
+  # 27. Warning for scales with Phantom Indicators
+  textWarningScalePI <- eventReactive(input$submitScalePIList, {
+    # Compile vector lists of scales with Phantom Indicators
+    warningTextScalePI <- unlist(strsplit(paste(input$checkboxesScalePI, collapse="; "), "; "))
+    # Print warning statements
+    if(length(warningTextScalePI)>1 & "None" %in% warningTextScalePI){
+      tags$h5('WARNING: For scales with Phantom Indicators, both "None" and some scales were selected. Please revise your selection and click the "Submit scales with Phantom Indicators" button again.')
+    } else if(length(warningTextScalePI)==0){
+      tags$h5('WARNING: For scales with Phantom Indicators, no option was selected. Please revise your selection and click the "Submit scales with Phantom Indicators" button again.')
+    } else {tags$h5("Scales with Phantom Indicators are OK!")}
+  })
+  output$warningScalePI <- renderUI({
+    textWarningScalePI()
+  })
+  # 28. Warning function for scales with Phantom Indicators
+  output$warningFunScalePI <- renderUI({
+    warn<-0
+    for(wrn in 1:length(textWarningScalePI())){
+      if(grepl("WARNING", textWarningScalePI()[wrn])==T){
+        warn<-warn+1
+      }
+    }
+    if(warn!=0){
+      tags$div(tags$h5("Ruh-roh!"), tags$img(src="RuhRoh.jpg", height="100%", width="100%"))
+    } else {tags$div(tags$h5("Relax :o)"), tags$img(src="Relax.jpeg", height="100%", width="100%"))}
+  })
+  # 29. Warning for scales that need additional dropping options
+  textWarningScaleDropOption <- eventReactive(input$submitScaleDropOptionList, {
+    # Compile vector lists of scales that need additional dropping options
+    warningTextScaleDropOption <- unlist(strsplit(paste(input$checkboxesScaleDropOption, collapse="; "), "; "))
+    # Print warning statements
+    if(length(warningTextScaleDropOption)>1 & "None" %in% warningTextScaleDropOption){
+      tags$h5('WARNING: For scales with additional dropping options, both "None" and some scales were selected. Please revise your selection and click the "Submit scales for additional dropping options" button again.')
+    } else if(length(warningTextScaleDropOption)==0){
+      tags$h5('WARNING: For scales with additional dropping options, no option was selected. Please revise your selection and click the "Submit scales for additional dropping options" button again.')
+    } else {tags$h5("Scales with with additional dropping options are OK!")}
+  })
+  output$warningScaleDropOption <- renderUI({
+    textWarningScaleDropOption()
+  })
+  # 30. Warning function for scales that need additional dropping options
+  output$warningFunScaleDropOption <- renderUI({
+    warn<-0
+    for(wrn in 1:length(textWarningScaleDropOption())){
+      if(grepl("WARNING", textWarningScaleDropOption()[wrn])==T){
+        warn<-warn+1
+      }
+    }
+    if(warn!=0){
+      tags$div(tags$h5("Ruh-roh!"), tags$img(src="RuhRoh.jpg", height="100%", width="100%"))
+    } else {tags$div(tags$h5("Relax :o)"), tags$img(src="Relax.jpeg", height="100%", width="100%"))}
+  })
+  # Create warnings for each scale selected for additional dropping options
+  # 31. Warning for dropped items
+  textWarningScaleDropItem <- eventReactive(input$submitScaleDroppingOptions, {
+    # Produce text if no scales are selected
+    if(input$checkboxesScaleDropOption[1]=="None"){
+      tags$h5("Nothing to report: (No scales for additional dropping options selected)")
+    } else {
+      warningTextScaleDropItem <- lapply(input$checkboxesScaleDropOption, function(scl){
+        # Compile vector lists of dropped items by scales selected for additional dropping options
+        testCheckboxesItem <- unlist(strsplit(paste(eval(substitute(input$z, list(z=as.name(paste0("dropItems_",scl))))), collapse="; "), "; "))
+        # Print warning statements
+        if(length(testCheckboxesItem)>1 & testCheckboxesItem[1]=="None"){
+          if(is.na(dfCntry()$Level[1])){
+            tags$h5(paste0('WARNING: For dropped items for the scale ',scl,', both "None" and some countries were selected. Please revise your selection and click the "Submit all scale dropping options" button again.'))
+          } else {
+            tags$h5(paste0('WARNING: For dropped items for the scale ',scl,', both "None" and some countries were selected. Please revise your selection and click the "Submit all scale dropping options, part 1" button again.'))
+          }
+        } else if(length(testCheckboxesItem)==0){
+          if(is.na(dfCntry()$Level[1])){
+            tags$h5(paste0('WARNING: For dropped items for the scale ',scl,', no option was selected. Please revise your selection and click the "Submit all scale dropping options" button again.'))
+          } else {
+            tags$h5(paste0('WARNING: For dropped items for the scale ',scl,', no option was selected. Please revise your selection and click the "Submit all scale dropping options, part 1" button again.'))
+          }
+        } else {tags$h5(paste0("Dropped items for ",scl," are OK!"))}
+      })
+      warningTextScaleDropItem
+    }
+  })
+  output$warningScaleDropItem <- renderUI({
+    textWarningScaleDropItem()
+  })
+  # 32. Warning function for dropped items
+  output$warningFunScaleDropItem <- renderUI({
+    if(is.null(textWarningScaleDropItem())){
+      return(NULL)
+    } else {
+      warn<-0
+      for(wrn in 1:length(textWarningScaleDropItem())){
+        if(grepl("WARNING", textWarningScaleDropItem()[wrn])==T){
+          warn<-warn+1
+        }
+      }
+      if(warn!=0){
+        tags$div(tags$h5("Ruh-roh!"), tags$img(src="RuhRoh.jpg", height="100%", width="100%"))
+      } else {tags$div(tags$h5("Relax :o)"), tags$img(src="Relax.jpeg", height="100%", width="100%"))}
+    }
+  })
+  # 33. Warning for specific population dropped items
+  textWarningScaleSpecificDropItem <- eventReactive(input$submitScaleDroppingOptions, {
+    if(input$checkboxesScaleDropOption[1]=="None"){
+      tags$h5("Nothing to report: (No scales for additional dropping options selected)")
+    } else {
+      warningTextScaleSpecificDropItem <- lapply(input$checkboxesScaleDropOption, function(scl){
+        # Get lists of bad inputs from the user
+        c(# Create master lists
+          ## Country list
+          listCountry <- sort(unique(na.omit(dfCntry()$CountryAlpha3))),
+          ## Level list
+          listLevel <- sort(unique(na.omit(dfCntry()$Level))),
+          ## Population list
+          listPop <- sort(unique(na.omit(dfCntry()$Pop))),
+          ## Item list
+          listScaleItems <- dfScale()$Items[dfScale()$Scale %in% scl],
+          listScaleItems <- unlist(strsplit(listScaleItems, " "), " "),
+          # Get item dropping information for specific countries, levels, and/or populations
+          ## Read user input
+          testSpecificPopDropItem <- unlist(strsplit(eval(substitute(input$z, list(z=as.name(paste0("specificPopDropItems_",scl))))), "; ")),
+          ## Trim leading and trailing white space
+          testSpecificPopDropItem <- trimws(testSpecificPopDropItem),
+          ## Use the user input to create user created population and item lists
+          listUserPops  <- c(),
+          listUserItems <- c(),
+          for(usr in 1:length(testSpecificPopDropItem)){
+            listUserPops  <- c(listUserPops,  unlist(strsplit(testSpecificPopDropItem[usr], ":"))[1])
+            listUserItems <- c(listUserItems, unlist(strsplit(testSpecificPopDropItem[usr], ":"))[2])
+          },
+          listUserPops  <- trimws(listUserPops),
+          listUserItems <- unlist(strsplit(listUserItems, ",")),
+          listUserItems <- trimws(listUserItems),
+          ## Get bad input from users as lists
+          badPops  <- c(),
+          badItems <- c(),
+          for(clp in 1:length(listUserPops)){
+            if(!((listUserPops[clp] %in% listCountry) | (listUserPops[clp] %in% listLevel) | (listUserPops[clp] %in% listPop))){
+              badPops <- c(badPops, listUserPops[clp])
+            }
+          },
+          for(itm in 1:length(listUserItems)){
+            if(!(listUserItems[itm] %in% listScaleItems)){
+              badItems <- c(badItems, listUserItems[itm])
+            }
+          },
+          badPops  <- na.omit(badPops),
+          badItems <- na.omit(badItems),
+          # Compile vector lists of dropped items by scales selected for additional dropping options for specific populations
+          badPops  <- paste(badPops, collapse=", "),
+          badItems <- paste(badItems, collapse=", ")
+        )
+        # Print warning statements
+        tags$div(
+          if(badPops!=""){
+            if(is.na(dfCntry()$Level[1])){
+              tags$h5(paste0('WARNING: For the scale ',scl,' the user input of dropped items for specific countries, levels, and/or populations has unrecognized countries, levels, and/or populations: ',badPops,'. Please revise your selection and click the "Submit all scale dropping options" button again.'))
+            } else {
+              tags$h5(paste0('WARNING: For the scale ',scl,' the user input of dropped items for specific countries, levels, and/or populations has unrecognized countries, levels, and/or populations: ',badPops,'. Please revise your selection and click the "Submit all scale dropping options, part 1" button again.'))
+            }
+          } else {
+            tags$h5(paste0("Specific countries/levels/populations for the dropped items for ",scl," are OK!"))
+          },
+          if(badItems!=""){
+            if(is.na(dfCntry()$Level[1])){
+              tags$h5(paste0('WARNING: For the scale ',scl,' the user input of dropped items for specific countries, levels, and/or populations has unrecognized items: ',badItems,'. Please revise your selection and click the "Submit all scale dropping options" button again.'))
+            } else {
+              tags$h5(paste0('WARNING: For the scale ',scl,' the user input of dropped items for specific countries, levels, and/or populations has unrecognized items: ',badItems,'. Please revise your selection and click the "Submit all scale dropping options, part 1" button again.'))
+            }
+          } else {
+            tags$h5(paste0("Specific dropped items for ",scl," are OK!"))
+          },
+          tags$hr()
+        )
+      })
+      warningTextScaleSpecificDropItem
+    }
+  })
+  output$warningScaleSpecificDropItem<- renderUI({
+    textWarningScaleSpecificDropItem()
+  })
+  # 34. Warning function for specific population dropped items
+  output$warningFunScaleSpecificDropItem <- renderUI({
+    if(is.null(textWarningScaleDropItem())){
+      return(NULL)
+    } else {
+      warn<-0
+      for(wrn in 1:length(textWarningScaleSpecificDropItem())){
+        if(grepl("WARNING", textWarningScaleSpecificDropItem()[wrn])==T){
+          warn<-warn+1
+        }
+      }
+      if(warn!=0){
+        tags$div(tags$h5("Ruh-roh!"), tags$img(src="RuhRoh.jpg", height="100%", width="100%"))
+      } else {tags$div(tags$h5("Relax :o)"), tags$img(src="Relax.jpeg", height="100%", width="100%"))}
+    }
+  })
+  # 35. Warning for dropped countries
+  textWarningScaleDropCountry <- eventReactive(input$submitScaleDroppingOptions, {
+    if(input$checkboxesScaleDropOption[1]=="None"){
+      tags$h5("Nothing to report: (No scales for additional dropping options selected)")
+    } else {
+      warningTextScaleDropCountry <- lapply(input$checkboxesScaleDropOption, function(scl){
+        # Compile vector lists of dropped countries by scales selected for additional dropping options
+        testSelectCountry <- unlist(strsplit(paste(eval(substitute(input$z, list(z=as.name(paste0("dropCountries_",scl))))), collapse="; "), "; "))
+        # Print warning statements
+        if(length(testSelectCountry)>1 & testSelectCountry[1]=="None"){
+          if(is.na(dfCntry()$Level[1])){
+            tags$h5(paste0('WARNING: For dropped countries for the scale ',scl,', both "None" and some countries were selected. Please revise your selection and click the "Submit all scale dropping options" button again.'))
+          } else {
+            tags$h5(paste0('WARNING: For dropped countries for the scale ',scl,', both "None" and some countries were selected. Please revise your selection and click the "Submit all scale dropping options, part 1" button again.'))
+          }
+        } else if(length(testSelectCountry)==0){
+          if(is.na(dfCntry()$Level[1])){
+            tags$h5(paste0('WARNING: For dropped countries for the scale ',scl,', no option was selected. Please revise your selection and click the "Submit all scale dropping options" button again.'))
+          } else {
+            tags$h5(paste0('WARNING: For dropped countries for the scale ',scl,', no option was selected. Please revise your selection and click the "Submit all scale dropping options, part 1" button again.'))
+          }
+        } else {tags$h5(paste0("Dropped countries for ",scl," are OK!"))}
+      })
+      warningTextScaleDropCountry
+    }
+  })
+  output$warningScaleDropCountry <- renderUI({
+    textWarningScaleDropCountry()
+  })
+  # 36. Warning function for dropped countries
+  output$warningFunScaleDropCountry <- renderUI({
+    if(is.null(textWarningScaleDropItem())){
+      return(NULL)
+    } else {
+      warn<-0
+      for(wrn in 1:length(textWarningScaleDropCountry())){
+        if(grepl("WARNING", textWarningScaleDropCountry()[wrn])==T){
+          warn<-warn+1
+        }
+      }
+      if(warn!=0){
+        tags$div(tags$h5("Ruh-roh!"), tags$img(src="RuhRoh.jpg", height="100%", width="100%"))
+      } else {tags$div(tags$h5("Relax :o)"), tags$img(src="Relax.jpeg", height="100%", width="100%"))}
+    }
+  })
+  # 37. Warning for dropped levels
+  textWarningScaleDropLevel <- eventReactive(input$submitScaleDroppingOptions, {
+    if(input$checkboxesScaleDropOption[1]=="None"){
+      tags$h5("Nothing to report: (No scales for additional dropping options selected)")
+    } else if(is.na(dfCntry()$Level[1])){
+      tags$h5("Nothing to report: (No levels in the study)")
+    } else {
+      # Compile vector lists of scales that need additional dropping options
+      warningTextScaleDropLevel <- lapply(input$checkboxesScaleDropOption, function(scl){
+        # Compile vector lists of dropped levels by scales selected for additional dropping options
+        testSelectLevel <- unlist(strsplit(paste(eval(substitute(input$z, list(z=as.name(paste0("dropLevels_",scl))))), collapse="; "), "; "))
+        # Print warning statements
+        if(length(testSelectLevel)>1 & testSelectLevel[1]=="None"){
+          if(is.na(dfCntry()$Level[1])){
+            tags$h5(paste0('WARNING: For dropped levels for the scale ',scl,', both "None" and some countries were selected. Please revise your selection and click the "Submit all scale dropping options" button again.'))
+          } else {
+            tags$h5(paste0('WARNING: For dropped levels for the scale ',scl,', both "None" and some countries were selected. Please revise your selection and click the "Submit all scale dropping options, part 1" button again.'))
+          }
+        } else if(length(testSelectLevel)==0){
+          if(is.na(dfCntry()$Level[1])){
+            tags$h5(paste0('WARNING: For dropped levels for the scale ',scl,', no option was selected. Please revise your selection and click the "Submit all scale dropping options" button again.'))
+          } else {
+            tags$h5(paste0('WARNING: For dropped levels for the scale ',scl,', no option was selected. Please revise your selection and click the "Submit all scale dropping options, part 1" button again.'))
+          }
+        } else {tags$h5(paste0("Dropped levels for ",scl," are OK!"))}
+      })
+      warningTextScaleDropLevel
+    }
+  })
+  output$warningScaleDropLevel <- renderUI({
+    if(is.null(dfCntry())){
+      return(NULL)
+    } else {
+      textWarningScaleDropLevel()
+    }
+  })
+  # 38. Warning function for dropped levels
+  output$warningFunScaleDropLevel <- renderUI({
+    if(is.null(textWarningScaleDropItem())){
+      return(NULL)
+    } else {
+      warn<-0
+      for(wrn in 1:length(textWarningScaleDropLevel())){
+        if(grepl("WARNING", textWarningScaleDropLevel()[wrn])==T){
+          warn<-warn+1
+        }
+      }
+      if(warn!=0){
+        tags$div(tags$h5("Ruh-roh!"), tags$img(src="RuhRoh.jpg", height="100%", width="100%"))
+      } else {tags$div(tags$h5("Relax :o)"), tags$img(src="Relax.jpeg", height="100%", width="100%"))}
+    }
+  })
+  # 39. Warning for dropped populations
+  textWarningScaleDropPop <- eventReactive(input$submitScaleDroppingOptions, {
+    if(input$checkboxesScaleDropOption[1]=="None"){
+      tags$h5("Nothing to report: (No scales for additional dropping options selected)")
+    } else if(is.na(dfCntry()$Level[1])){
+      tags$h5("Nothing to report: (No populations in the study)")
+    } else {
+      # Compile vector lists of scales that need additional dropping options
+      warningTextScaleDropPop <- lapply(input$checkboxesScaleDropOption, function(scl){
+        # Compile vector lists of dropped populations by scales selected for additional dropping options
+        testSelectPop <- unlist(strsplit(paste(eval(substitute(input$z, list(z=as.name(paste0("dropPops_",scl))))), collapse="; "), "; "))
+        # Print warning statements
+        if(length(testSelectPop)>1 & testSelectPop[1]=="None"){
+          if(is.na(dfCntry()$Level[1])){
+            tags$h5(paste0('WARNING: For dropped populations for the scale ',scl,', both "None" and some countries were selected. Please revise your selection and click the "Submit all scale dropping options" button again.'))
+          } else {
+            tags$h5(paste0('WARNING: For dropped populations for the scale ',scl,', both "None" and some countries were selected. Please revise your selection and click the "Submit all scale dropping options, part 1" button again.'))
+          }
+        } else if(length(testSelectPop)==0){
+          if(is.na(dfCntry()$Level[1])){
+            tags$h5(paste0('WARNING: For dropped populations for the scale ',scl,', no option was selected. Please revise your selection and click the "Submit all scale dropping options" button again.'))
+          } else {
+            tags$h5(paste0('WARNING: For dropped populations for the scale ',scl,', no option was selected. Please revise your selection and click the "Submit all scale dropping options, part 1" button again.'))
+          }
+        } else {tags$h5(paste0("Dropped populations for ",scl," are OK!"))}
+      })
+      warningTextScaleDropPop
+    }
+  })
+  output$warningScaleDropPop <- renderUI({
+    if(is.null(dfCntry())){
+      return(NULL)
+    } else {
+      textWarningScaleDropPop()
+    }
+  })
+  # 40. Warning function for dropped populations
+  output$warningFunScaleDropPop <- renderUI({
+    if(is.null(textWarningScaleDropItem())){
+      return(NULL)
+    } else {
+      warn<-0
+      for(wrn in 1:length(textWarningScaleDropPop())){
+        if(grepl("WARNING", textWarningScaleDropPop()[wrn])==T){
+          warn<-warn+1
+        }
+      }
+      if(warn!=0){
+        tags$div(tags$h5("Ruh-roh!"), tags$img(src="RuhRoh.jpg", height="100%", width="100%"))
+      } else {tags$div(tags$h5("Relax :o)"), tags$img(src="Relax.jpeg", height="100%", width="100%"))}
+    }
+  })
+  ################################################
+  
+  # CREATE OUTPUT FILES
+  # Create a 'reactive event' for when the "submitAnalysisOptions" action button is clicked
+  textFromInputs <- eventReactive(input$submitAnalysisOptions, {
+    ###################################   Global Options   #########################################
+    # Variables for Log files (source: ) #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< name these when we have them <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< possibly not needed to differentiate <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< reorganize <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    ## Study name
+    nameStudy  <- dfSetup()$FixedInformation[1]
+    ## Directories
+    ### Raw data directory
+    dirRawData <- gsub("\\\\","/",dfSetup()$FixedInformation[3])
+    if(is.na(dirRawData)){dirRawData <- "Not provided"}
+    ### Root 'implementation' directory
+    dirRoot    <- gsub("\\\\","/",dfSetup()$FixedInformation[4])
+    if(is.na(dirRoot)){dirRoot <- "Not provided"}
+    ### Reporting directory (e.g. technical reports) #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< possibly fold this into implementation <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    dirReport  <- gsub("\\\\","/",dfSetup()$FixedInformation[5])
+    if(is.na(dirReport)){dirReport <- "Not provided"}
+    ### R script source files directory
+    dirSource  <- gsub("\\\\","/",dfSetup()$FixedInformation[6])
+    if(is.na(dirSource)){dirSource <- "Not provided"}
+    ### Setup Excel file directory
+    dirSetup   <- gsub("\\\\","/",dfSetup()$FixedInformation[7])
+    if(is.na(dirSource)){dirSource <- "Not provided"}
+    ## Global options
+    ### Analysis phase
+    if(!is.na(dfSetup()$AnalysisPhase[1])){
+      selectionAnalysisPhase   <- input$selectAnalysisPhase
+    } else {
+      selectionAnalysisPhase   <- "None" 
+    }
+    ### Group population (e.g. teacher, principal, staff)
+    if(!is.na(dfSetup()$Group[2])){
+      selectionGroup           <- input$selectGroup
+    } else {
+      selectionGroup           <- dfSetup()$Group[1] 
+    }
+    ### Analysis type (e.g. type of CFA or IRT)
+    #### Create a vector of analysis types that were selected in the setup file
+    cfas <- c()
+    #### Count non-missing values in the "AnalysisType" column
+    noMissing <- length(na.omit(dfSetup()$AnalysisCheck))
+    for(row in 1:noMissing){
+      if(dfSetup()$AnalysisCheck[row]=="TRUE"){
+        cfas <- c(cfas,dfSetup()$AnalysisType[row])
+      }
+    }
+    if(length(unique(na.omit(cfas)))>1){
+      selectionAnalysis        <- input$selectAnalysis
+    } else {
+      selectionAnalysis        <- cfas[1]
+    }
+    ### Analysis round
+    selectionRound             <- input$selectRound
+    ### Group ID variable
+    if(!is.na(dfSetup()$Group[2])){
+      selectionGroupCodeVar    <- dfSetup()$GroupIDVar[dfSetup()$Group %in% input$selectGroup]
+    } else {
+      selectionGroupCodeVar    <- dfSetup()$GroupIDVar[1]
+    }
+    ### Stratification variable
+    if(!is.na(dfSetup()$Group[2])){
+      selectionStrat           <- dfSetup()$Stratification[dfSetup()$Group %in% input$selectGroup]
+    } else {
+      selectionStrat           <- dfSetup()$Stratification[1]
+    }
+    ### Cluster variable
+    if(!is.na(dfSetup()$Group[2])){
+      selectionCluster         <- dfSetup()$Cluster[dfSetup()$Group %in% input$selectGroup]
+    } else {
+      selectionCluster         <- dfSetup()$Cluster[1]
+    }
+    ### Weight variable
+    if(!is.na(dfSetup()$Weight[2])){
+      selectionWeight          <- input$selectWeight
+    } else {
+      selectionWeight          <- dfSetup()$Weight[1]
+    }
+    ### ID variables
+    selectionIDVars            <- paste(na.omit(dfSetup()$IDVars), collapse=" ")
+    ### Globally dropped countries, levels, and populations
+    selectionGlobalDropCountry <- paste(input$selectCountry, collapse="; ")
+    if(!is.na(dfSetup()$FixedInformation[11])){
+      selectionGlobalDropLevel <- paste(input$selectLevel, collapse="; ")
+    } else {
+      selectionGlobalDropLevel <- "None"
+    }
+    if(!is.na(dfSetup()$FixedInformation[13])){
+      selectionGlobalDropPop   <- paste(input$selectPop, collapse="; ")
+    } else {
+      selectionGlobalDropPop   <- "None"
+    }
+    ### Adjudication variable
+    if(!is.na(dfSetup()$FixedInformation[9])){
+      if(input$radioAdjudicateVar=="Yes"){
+        selectionAdjudicateVar <- dfSetup()$FixedInformation[9]
+      } else {
+        selectionAdjudicateVar <- "None"
+      }
+    } else {
+      selectionAdjudicateVar   <- "None"
+    }
+    ### Numeric code for adjudicated cases
+    selectionAdjudicateCode    <- dfSetup()$FixedInformation[10]
+    ### Country numeric code variable
+    selectionCountryCodeVar    <- dfSetup()$FixedInformation[11]
+    ### Level numeric code variable
+    selectionLevelCodeVar      <- dfSetup()$FixedInformation[12]
+    ### Numeric code for the target level
+    selectionTargetLevelCode   <- dfSetup()$FixedInformation[13]
+    ### Numeric code for the target level
+    selectionPopCodeVar        <- dfSetup()$FixedInformation[14]
+    ### Whether to include model improvements
+    selectionImprove           <- input$radioImprove
+    ### Whether to save factor scores
+    if(input$selectAnalysis=="Cross-country MGCFA with MI testing" | input$selectAnalysis=="Cross-country, cross-level MGCFA"){
+      selectionFS              <- "No"
+    } else {
+      selectionFS              <- input$radioFS
+    }
+    ### Whether to run Mplus to produce output files
+    selectionMplusAuto         <- input$radioMplusAuto
+    ### Filename suffix
+    if(input$radioSuffix=="Yes"){
+      selectionSuffix          <- input$writeSuffix
+    } else {
+      selectionSuffix          <- "None"
+    }
+    ### Scale list
+    selectionListScale         <- paste(input$checkboxesScale, collapse="; ")
+    ### Scale with Phantom Indicators list
+    selectionListScalePI       <- paste(input$checkboxesScalePI, collapse="; ") #<<<<<<<<<<<<<<<<<<< consider deleting here and adding to initial run to make scale dataset <<<
+    # Additional modificatins for Mplus input files (source: ) #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< name these when we have them <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    for(row in 1:nrow(dfSetup())){
+      if(selectionAnalysisPhase %in% dfSetup()$AnalysisPhase[row]){
+        dirAnalysisPhase <- paste0(row,gsub(" ","",selectionAnalysisPhase,fixed=T),"/")
+      }
+      if(selectionGroup %in% dfSetup()$Group[row]){
+        dirGroup         <- paste0(row,gsub(" ","",selectionGroup,fixed=T),"/")
+      }
+      if(selectionAnalysis %in% dfSetup()$AnalysisType[row]){
+        dirAnalysis      <- paste0(row,gsub(" ","",selectionAnalysis,fixed=T),"/")
+      }
+      if(selectionRound %in% dfSetup()$Round[row]){
+        dirRound         <- paste0(row,gsub(" ","",selectionRound,fixed=T),"/")
+      }
+    }
+    ###################################   Scale Options   ##########################################
+    textInputField <- lapply(input$checkboxesScale, function(scl){
+      selectionScale                  <- scl
+      if(scl %in% input$checkboxesScaleDropOption){
+        selectionScaleDropItems       <- paste(eval(substitute(input$z, list(z=as.name(paste0("dropItems_",scl))))), collapse="; ")
+        selectionScaleDropSpecifics   <- eval(substitute(input$z, list(z=as.name(paste0("specificPopDropItems_",scl)))))
+        if(selectionScaleDropSpecifics==""){
+          selectionScaleDropSpecifics <- "None"
+        }
+        selectionScaleDropCountry     <- paste(eval(substitute(input$z, list(z=as.name(paste0("dropCountries_",scl))))), collapse="; ")
+        selectionScaleDropLevel       <- paste(eval(substitute(input$z, list(z=as.name(paste0("dropLevels_",scl))))), collapse="; ") #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        selectionScaleDropPop         <- paste(eval(substitute(input$z, list(z=as.name(paste0("dropPops_",scl))))), collapse="; ") #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+      } else {
+        selectionScaleDropItems       <- "None"
+        selectionScaleDropSpecifics   <- "None"
+        selectionScaleDropCountry     <- "None"
+        selectionScaleDropLevel       <- "None"
+        selectionScaleDropPop         <- "None"
+      }
+      selectionFilename               <- paste0(gsub(" ","",selectionAnalysis),"_",scl)
+      date <- unlist(strsplit(as.character(Sys.time()), " "))[1]
+      time <- unlist(strsplit(as.character(Sys.time()), " "))[2]
+      time <- gsub(":", "'", time)
+      selectionFilenameDate           <- paste0(selectionFilename,"_",selectionSuffix,"_",date,"_",time)
+      # Call source files and run their functions
+      ## Log files
+      source(paste0(dirSource,"/source.R"))
+      run.source.logs(nameStudy, dirRawData, dirRoot, dirReport, dirSource, dirSetup, selectionAnalysisPhase, selectionGroup, selectionAnalysis, selectionRound, selectionGroupCodeVar, selectionStrat, selectionCluster, selectionWeight, selectionIDVars, selectionGlobalDropCountry, selectionGlobalDropLevel, selectionGlobalDropPop, selectionAdjudicateVar, selectionAdjudicateCode, selectionCountryCodeVar, selectionLevelCodeVar, selectionTargetLevelCode, selectionPopCodeVar, selectionImprove, selectionFS, selectionMplusAuto, selectionSuffix, selectionListScale, selectionListScalePI, dirAnalysisPhase, dirGroup, dirAnalysis, dirRound, selectionScale, selectionScaleDropItems, selectionScaleDropSpecifics, selectionScaleDropCountry, selectionScaleDropLevel, selectionScaleDropPop, selectionFilename, selectionFilenameDate)
+      ## Mplus input files
+      source(paste0(dirSource,"/source_2aCFAanalyses.R"))
+      run.CFA(nameStudy,dirRoot,dirAnalysisPhase,dirGroup,selectionGroup,dirAnalysis,selectionAnalysis,dirRound,selectionIDVars,selectionGroupCodeVar,selectionStrat,selectionCluster,selectionWeight,selectionGlobalDropCountry,selectionGlobalDropLevel,selectionGlobalDropPop,selectionAdjudicateVar,selectionAdjudicateCode,selectionCountryCodeVar,selectionLevelCodeVar,selectionTargetLevelCode,selectionPopCodeVar,selectionImprove,selectionFS,selectionMplusAuto,selectionSuffix,selectionListScalePI,selectionScale,selectionScaleDropItems,selectionScaleDropSpecifics,selectionScaleDropCountry,selectionScaleDropLevel,selectionScaleDropPop)
+      # Provide output for user
+      tags$h5(paste0("Scale ",scl," is done :o)"))
+    })
+    textInputField
+  })
+  # 41. R output notes
+  output$Routput <- renderUI({
+    textFromInputs()
+  })
+}
+shinyApp(ui=ui, server=server)
+
+# END
+
+
+
+
+
+#####
